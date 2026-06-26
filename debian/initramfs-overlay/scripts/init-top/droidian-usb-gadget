@@ -1,0 +1,50 @@
+#!/bin/sh
+
+PREREQ="udev"
+
+prereqs()
+{
+	echo "$PREREQ"
+}
+
+case "$1" in
+prereqs)
+	prereqs
+	exit 0
+	;;
+esac
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+LOG=/run/initramfs/droidian-normal-boot.log
+
+log()
+{
+	mkdir -p /run/initramfs
+	echo "droidian-normal-boot: $*" >> "$LOG"
+	[ -e /dev/kmsg ] && echo "droidian-normal-boot: $*" > /dev/kmsg
+}
+
+write_if_exists()
+{
+	[ -e "$1" ] || return 1
+	echo "$2" > "$1" 2>> "$LOG"
+}
+
+force_peripheral_role()
+{
+	for role in \
+		/sys/class/dual_role_usb/*/mode \
+		/sys/class/dual_role_usb/*/data_role \
+		/sys/class/usb_role/*/role \
+		/sys/devices/platform/*/mode \
+		/sys/devices/platform/*/*/mode
+	do
+		[ -e "$role" ] || continue
+		write_if_exists "$role" peripheral || write_if_exists "$role" device
+	done
+}
+
+log "normal boot hook start; not entering panic telnet"
+force_peripheral_role
+log "normal boot hook done"
+exit 0
