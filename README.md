@@ -35,8 +35,10 @@ The `helper` directory contains scripts and assets for post-installation on Droi
 ## Power Button fix
 run the below command through ssh to fix the power button
 ```bash
-wget https://raw.githubusercontent.com/DeadPool-4422/kernel_realme_RMX2001/droidian/helpers/power-button/script.sh && chmod +x script.sh && ./script.sh
+wget https://raw.githubusercontent.com/Hari-Pi/kernel_realme_RMX2001/droidian/helpers/power-button/script.sh && chmod +x script.sh && ./script.sh && sudo apt install libdroid-hal-lights
 ```
+
+
 
 ### WiFi Setup Instructions
 - Connect the Droidian device to a Linux system via USB.
