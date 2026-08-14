@@ -17,14 +17,14 @@
 
 set -e
 
-echo "== 1/6: killing the modem stack (ofono2mm crash-loops with no SIM in use) =="
+echo "== 1/11: killing the modem stack (ofono2mm crash-loops with no SIM in use) =="
 sudo systemctl mask --now ofono ModemManager
 
-echo "== 2/6: switching to text-mode boot, no Phosh GUI =="
+echo "== 2/11: switching to text-mode boot, no Phosh GUI =="
 sudo systemctl set-default multi-user.target
 sudo systemctl disable phosh
 
-echo "== 3/6: masking unused phone-hardware services =="
+echo "== 3/11: masking unused phone-hardware services =="
 sudo systemctl mask --now \
   cups cups-browsed cups.socket cups.path \
   bluetooth bluebinder \
@@ -37,10 +37,10 @@ sudo systemctl mask --now \
   polkit upower
 sudo systemctl disable --now apt-daily.timer apt-daily-upgrade.timer
 
-echo "== 4/6: disabling the Plymouth boot splash =="
+echo "== 4/11: disabling the Plymouth boot splash =="
 sudo systemctl mask plymouth-start.service
 
-echo "== 5/6: installing early best-effort framebuffer blank =="
+echo "== 5/11: installing early best-effort framebuffer blank =="
 sudo tee /usr/lib/systemd/system/blank-display.service > /dev/null <<'EOF'
 [Unit]
 Description=Blank display and kill backlight (headless server, prevent OLED burn-in)
@@ -57,7 +57,7 @@ ExecStart=/bin/sh -c "echo 1 > /sys/class/graphics/fb0/blank 2>/dev/null; echo 0
 WantedBy=multi-user.target
 EOF
 
-echo "== 6/6: installing the real display power-off cycle =="
+echo "== 6/11: installing the real display power-off cycle =="
 # The bootloader/Plymouth draw the panel via a hardware overlay plane that
 # only gets released once something real (phoc, via the hwcomposer HAL)
 # takes ownership of the display and issues an explicit power-off. Nothing
@@ -109,6 +109,82 @@ EOF
 sudo systemctl daemon-reload
 sudo systemctl enable display-poweroff.service
 
+echo "== 7/11: enabling zram swap (device ships with none at all) =="
+sudo tee /usr/lib/systemd/system/zram-swap.service > /dev/null <<'EOF'
+[Unit]
+Description=Set up zram-backed swap (headless, no swap partition available)
+DefaultDependencies=no
+After=local-fs.target
+Before=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c "echo lz4 > /sys/block/zram0/comp_algorithm && echo 2G > /sys/block/zram0/disksize && /sbin/mkswap /dev/zram0 && /sbin/swapon --priority 100 /dev/zram0"
+ExecStop=/sbin/swapoff /dev/zram0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable zram-swap.service
+
+# page-cluster=0 matters most here: the default reads swap in 8-page
+# batches, which is right for a spinning disk and wasteful for RAM-backed
+# zram. swappiness=100 looks aggressive but is correct with zram, since
+# swapping to compressed RAM is cheaper than dropping page cache.
+sudo tee /etc/sysctl.d/99-headless.conf > /dev/null <<EOF
+vm.swappiness = 100
+vm.page-cluster = 0
+vm.vfs_cache_pressure = 50
+vm.dirty_ratio = 10
+vm.dirty_background_ratio = 5
+EOF
+sudo sysctl --system > /dev/null 2>&1
+
+echo "== 8/11: pinning CPU governor to performance =="
+# Verified stable at 37-44C under this on the RMX2001's MT6785 with no
+# active cooling - well below throttle territory. Re-check thermals if
+# running this on different hardware before trusting it long-term.
+sudo tee /usr/lib/systemd/system/cpu-performance.service > /dev/null <<EOF
+[Unit]
+Description=Pin CPU governor to performance (headless server, thermal headroom verified)
+DefaultDependencies=no
+After=local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/sh -c "for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > \$g; done"
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable cpu-performance.service
+
+echo "== 9/11: capping journald =="
+sudo mkdir -p /etc/systemd/journald.conf.d
+sudo tee /etc/systemd/journald.conf.d/99-cap.conf > /dev/null <<EOF
+[Journal]
+SystemMaxUse=64M
+RuntimeMaxUse=32M
+ForwardToSyslog=no
+EOF
+sudo systemctl restart systemd-journald
+
+echo "== 10/11: TCP congestion control - bic (2006-era default) to cubic =="
+sudo tee -a /etc/sysctl.d/99-headless.conf > /dev/null <<EOF
+net.ipv4.tcp_congestion_control = cubic
+EOF
+sudo sysctl --system > /dev/null 2>&1
+
+echo "== 11/11: masking PulseAudio (no audio use on a headless box) =="
+# Socket-activated with Accept=no, so it self-starts on every login even
+# though nothing ever plays audio. Masked per-user, persists via
+# ~/.config/systemd/user/ symlinks, survives reboot and new sessions.
+systemctl --user mask --now pulseaudio.service pulseaudio.socket 2>/dev/null || true
+
 echo
 echo "Done. Reboot to apply (default target, Plymouth removal, and the"
 echo "display power-off cycle only take effect at boot):"
@@ -117,3 +193,8 @@ echo "    sudo reboot"
 echo
 echo "SSH, Wi-Fi (lxc@android), and Tailscale are all untouched - verify"
 echo "SSH access before disconnecting, same as any remote change."
+echo
+echo "Not included: remounting /userdata without data=journal/nodelalloc."
+echo "That partition is bind-shared with /android/data and the remount"
+echo "needs an fstab edit plus reboot - higher risk, do it separately if"
+echo "you want the extra write throughput."
