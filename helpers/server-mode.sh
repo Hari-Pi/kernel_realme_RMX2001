@@ -114,8 +114,14 @@ wait_for_wayland() {
 mask_phone_units() {
     for unit in $PHONE_UNITS; do
         unit_exists "$unit" || continue
+        if [ "$(systemctl is-enabled "$unit" 2>/dev/null || true)" = masked ]; then
+            log "  $unit is already masked"
+            continue
+        fi
+        log "  masking $unit"
         systemctl mask --now "$unit" >/dev/null 2>&1 || warn "could not mask $unit"
     done
+    log "  disabling automatic package timers"
     systemctl disable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
     unit_exists plymouth-start.service && systemctl mask plymouth-start.service >/dev/null 2>&1 || true
 }
@@ -123,6 +129,7 @@ mask_phone_units() {
 restore_phone_units() {
     for unit in $PHONE_UNITS; do
         unit_exists "$unit" || continue
+        log "  unmasking $unit"
         systemctl unmask "$unit" >/dev/null 2>&1 || warn "could not unmask $unit"
     done
     unit_exists plymouth-start.service && systemctl unmask plymouth-start.service >/dev/null 2>&1 || true
@@ -130,6 +137,7 @@ restore_phone_units() {
 
     for unit in $GUI_START_UNITS; do
         unit_exists "$unit" || continue
+        log "  starting $unit"
         systemctl start "$unit" >/dev/null 2>&1 || warn "could not start $unit"
     done
 }
@@ -140,6 +148,15 @@ mask_user_audio() {
     gid=$(desktop_gid "$user")
     config_dir=$(desktop_home "$user")/.config/systemd/user
 
+    if [ -L "$config_dir/pulseaudio.service" ] &&
+       [ "$(readlink "$config_dir/pulseaudio.service")" = /dev/null ] &&
+       [ -L "$config_dir/pulseaudio.socket" ] &&
+       [ "$(readlink "$config_dir/pulseaudio.socket")" = /dev/null ]; then
+        log "  audio services are already disabled for $user"
+        return 0
+    fi
+
+    log "  stopping audio services for $user"
     user_systemctl "$user" stop pulseaudio.service pulseaudio.socket >/dev/null 2>&1 || true
     install -d -o "$uid" -g "$gid" -m 700 "$config_dir"
     ln -sfn /dev/null "$config_dir/pulseaudio.service"
@@ -159,6 +176,7 @@ restore_user_audio() {
         fi
     done
 
+    log "  restoring audio services for $user"
     user_systemctl "$user" daemon-reload >/dev/null 2>&1 || true
     user_systemctl "$user" start pulseaudio.socket pulseaudio.service >/dev/null 2>&1 || true
 }
@@ -167,6 +185,7 @@ android_hal_set() {
     action=$1
     systemctl is-active --quiet lxc@android.service || systemctl start lxc@android.service
     for service in $ANDROID_HAL_UNITS; do
+        log "  $action $service"
         lxc-attach -n android -- /system/bin/"$action" "$service" >/dev/null 2>&1 || \
             warn "could not $action Android service $service"
     done
@@ -200,22 +219,28 @@ restore_brightness() {
 
 display_off() {
     user=$1
+    log "  starting Android hardware composer"
     save_brightness
     systemctl start lxc@android.service >/dev/null 2>&1 || true
     systemctl start android-service@hwcomposer.service >/dev/null 2>&1 || true
+    log "  starting Phosh to take ownership of the panel"
     systemctl start phosh.service
 
+    log "  waiting for the Wayland display"
     if wait_for_wayland "$user"; then
         # The socket appears before Phosh has fully taken ownership of the
         # bootloader overlay. Without this settle time, the panel can remain
         # latched on the boot logo even though brightness reports zero.
+        log "  allowing the bootloader overlay to settle (8 seconds)"
         sleep 8
+        log "  disabling $DISPLAY_OUTPUT"
         run_wayland "$user" wlr-randr --output "$DISPLAY_OUTPUT" --off >/dev/null 2>&1 || \
             warn "could not disable $DISPLAY_OUTPUT through Wayland"
     else
         warn "Wayland did not become ready before display shutdown"
     fi
 
+    log "  stopping Phosh and the hardware composer"
     systemctl stop phosh.service >/dev/null 2>&1 || true
     systemctl stop android-service@hwcomposer.service >/dev/null 2>&1 || true
     [ -w "$FB_BLANK_FILE" ] && printf '1\n' > "$FB_BLANK_FILE"
@@ -225,17 +250,21 @@ display_off() {
 
 display_on() {
     user=$1
+    log "  starting Android hardware composer"
     systemctl start lxc@android.service
     systemctl start android-service@hwcomposer.service
     [ -w "$FB_BLANK_FILE" ] && printf '0\n' > "$FB_BLANK_FILE"
     restore_brightness
+    log "  starting Phosh"
     systemctl start phosh.service
 
+    log "  waiting for the Wayland display"
     if ! wait_for_wayland "$user"; then
         warn "Wayland did not become ready"
         return 1
     fi
 
+    log "  enabling $DISPLAY_OUTPUT"
     run_wayland "$user" wlr-randr --output "$DISPLAY_OUTPUT" --on >/dev/null 2>&1 || \
         warn "could not explicitly enable $DISPLAY_OUTPUT; Phosh may already have enabled it"
     restore_brightness
@@ -312,13 +341,20 @@ mode_on() {
     [ -n "$user" ] || exit 1
     write_mode on
     log "Enabling server mode..."
+    log "[1/7] Setting the default boot target"
     systemctl set-default multi-user.target >/dev/null
+    log "[2/7] Disabling the power-button helper"
     systemctl disable --now pbhelper.service >/dev/null 2>&1 || true
+    log "[3/7] Powering off the display"
     display_off "$user"
+    log "[4/7] Disabling graphical startup"
     systemctl disable phosh.service >/dev/null 2>&1 || true
     systemctl enable display-poweroff.service android-hal-trim.service >/dev/null
+    log "[5/7] Stopping unused Android phone HALs"
     android_hal_set stop
+    log "[6/7] Disabling desktop audio"
     mask_user_audio "$user"
+    log "[7/7] Disabling phone-only background services"
     mask_phone_units
     log "Server mode is on. SSH, networking, Cloudflare, and Docker were not changed."
 }
@@ -328,14 +364,21 @@ mode_off() {
     [ -n "$user" ] || exit 1
     write_mode off
     log "Restoring phone GUI mode..."
+    log "[1/7] Restoring phone background services"
     restore_phone_units
+    log "[2/7] Restoring desktop audio"
     restore_user_audio "$user"
+    log "[3/7] Disabling server-only boot units"
     systemctl disable --now display-poweroff.service android-hal-trim.service >/dev/null 2>&1 || true
+    log "[4/7] Setting the graphical boot target"
     systemctl set-default graphical.target >/dev/null
     systemctl enable phosh.service >/dev/null
+    log "[5/7] Starting Android phone HALs"
     android_hal_set start
+    log "[6/7] Restoring the display and touch interface"
     systemctl start graphical.target >/dev/null 2>&1 || true
     display_on "$user"
+    log "[7/7] Enabling the power-button helper"
     if unit_exists pbhelper.service; then
         systemctl enable --now pbhelper.service >/dev/null 2>&1 || warn "could not start pbhelper.service"
     fi
