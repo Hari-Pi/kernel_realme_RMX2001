@@ -32,6 +32,24 @@ use then api29 zip from droidian [ci-images](https://github.com/droidian-images/
 ## Helper Scripts and Assets
 The `helper` directory contains scripts and assets for post-installation on Droidian devices. Included is a script for configuring the power button to turn on the screen.
 
+## Reversible server mode
+
+Install the mode command from a repository checkout. The installer detects the
+invoking desktop user; use `--user NAME` when installing as root or when the
+device has multiple interactive users.
+
+```bash
+sudo helpers/server-mode.sh install
+server mode status
+server mode on
+server mode off
+```
+
+`server mode on` disables the phone interface while leaving SSH, networking,
+Cloudflare tunnels, Docker, and persistent performance tuning untouched.
+`server mode off` restores Phosh, the display, touch input, audio, Android phone
+HALs, and the power-button helper. The selected mode persists across reboots.
+
 ## Power Button fix
 run the below command through ssh to fix the power button
 ```bash
