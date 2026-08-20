@@ -13,9 +13,9 @@ readonly BOOT_CMDLINE='bootopt=64S3,32N2,64N2 buildvariant=userdebug droidian.lv
 root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 mode=build
 allow_dirty=0
-jobs=${JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || printf '8')}
+jobs=${JOBS:-}
 output_root=${OUTPUT_DIR:-"$(dirname "$root")/rmx2001-kernel-artifacts"}
-key_file=${DROIDIAN_KEY_FILE:-"$HOME/.cache/droidian-kernel-build/droidian.gpg"}
+key_file=${DROIDIAN_KEY_FILE:-"$root/helpers/keys/droidian.gpg"}
 build_tree=
 artifact_directory=
 build_succeeded=0
@@ -30,8 +30,8 @@ Debian package in an isolated clean checkout.
 Options:
   --check-only       Validate prerequisites without compiling
   --allow-dirty      Permit a dirty source tree (recorded in the manifest)
-  --jobs N           Limit build CPUs (default: host CPU count)
-  --key FILE         Droidian archive keyring file
+  --jobs N           Limit build CPUs (default: all available host CPUs)
+  --key FILE         Override the bundled Droidian archive public key
   --output DIR       Artifact root outside the source tree
   -h, --help         Show this help
 
@@ -42,6 +42,15 @@ EOF
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 note() { printf '==> %s\n' "$*"; }
 require() { command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"; }
+detect_jobs() {
+    if command -v nproc >/dev/null 2>&1; then
+        nproc
+    elif command -v getconf >/dev/null 2>&1; then
+        getconf _NPROCESSORS_ONLN
+    else
+        die 'unable to detect available CPUs; install coreutils or pass --jobs N'
+    fi
+}
 
 while (($#)); do
     case $1 in
@@ -55,6 +64,7 @@ while (($#)); do
     esac
 done
 
+[[ -n $jobs ]] || jobs=$(detect_jobs)
 [[ $jobs =~ ^[1-9][0-9]*$ ]] || die '--jobs must be a positive integer'
 [[ $(uname -s) == Linux ]] || die 'build host must be Linux (WSL 2 is supported)'
 [[ $(uname -m) == x86_64 ]] || die 'build host must be x86_64/amd64'

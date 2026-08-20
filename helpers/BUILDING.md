@@ -8,19 +8,25 @@ packaging flow and never flashes a device.
 - Linux x86_64 host (WSL 2 is supported)
 - Docker daemon access
 - Git and at least 25 GiB free space
-- The Droidian archive key matching the fingerprint embedded in the script
+
+The Droidian archive public key is bundled in `helpers/keys/` and is verified
+against its pinned checksum and fingerprint before use.
 
 Run checks only:
 
 ```sh
-./build.sh --check-only --key /path/to/droidian.gpg
+./build.sh --check-only
 ```
 
 Build packages and extract a verified `boot.img`:
 
 ```sh
-./build.sh --key /path/to/droidian.gpg --jobs 16
+./build.sh
 ```
+
+By default the build uses every CPU available to the host. Use `--jobs N` only
+when you intentionally want to limit it. `--key FILE` remains available when
+CI keeps another copy of the same pinned key elsewhere.
 
 Artifacts are written outside the source tree to
 `../rmx2001-kernel-artifacts/<timestamp>-<commit>/`. Every build includes the
