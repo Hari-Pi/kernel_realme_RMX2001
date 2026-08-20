@@ -360,10 +360,6 @@ static unsigned int mtk_idle_output_log(
 			print_log = true;
 		} else if (check_print_log_duration()) {
 			print_log = true;
-		} else if (wakesta->timer_out <= IDLE_TIMER_OUT_CRITERIA) {
-			print_log = true;
-			if (wakesta->r12 == R12_AP2AP_PEER_WAKEUP_EVENT)
-				print_log = false;
 		}
 	}
 
@@ -378,4 +374,3 @@ static unsigned int mtk_idle_output_log(
 
 	return wr;
 }
-
