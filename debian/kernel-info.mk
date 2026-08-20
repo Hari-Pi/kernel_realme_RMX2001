@@ -24,6 +24,9 @@ DEVICE_MODEL = rmx2001
 # Marketing-friendly full-name. This will be used inside package descriptions
 DEVICE_FULL_NAME = RealMe 6
 
+# RMX2001 uses a legacy boot partition and has no separate init_boot partition.
+DEVICE_HAS_INIT_BOOT = 0
+
 # Whether to use configuration fragments to augment the kernel configuration.
 # If unsure, keep this to 0.
 KERNEL_CONFIG_USE_FRAGMENTS = 0
@@ -116,13 +119,16 @@ BUILD_CLANG_TRIPLET = aarch64-linux-gnu-
 # The compiler to use. Recent Android kernels are built with clang.
 BUILD_CC = clang
 
+# Version suffix of Droidian's packaged Android clang toolchain.
+CLANG_VERSION = 6.0-4691093
+
 # Extra paths to prepend to the PATH variable. You'll probably want
 # to specify the clang path here (the default).
-BUILD_PATH = /buildd/sources/clang/bin
+BUILD_PATH = /usr/lib/llvm-android-6.0-4691093/bin
 
 # Extra packages to add to the Build-Depends section. Mainline builds
 # can have this section empty, unless cross-building.
-DEB_TOOLCHAIN = linux-initramfs-halium-generic:arm64, binutils-aarch64-linux-gnu, clang-android-6.0-4691093, gcc-4.9-aarch64-linux-android, g++-4.9-aarch64-linux-android, libgcc-4.9-dev-aarch64-linux-android-cross
+DEB_TOOLCHAIN = linux-initramfs-halium-generic:arm64, binutils-aarch64-linux-gnu, gcc-4.9-aarch64-linux-android, g++-4.9-aarch64-linux-android, libgcc-4.9-dev-aarch64-linux-android-cross
 
 # Where we're building on
 DEB_BUILD_ON = amd64
@@ -135,4 +141,3 @@ KERNEL_ARCH = arm64
 
 # Kernel target to build
 KERNEL_BUILD_TARGET = Image.gz-dtb
-

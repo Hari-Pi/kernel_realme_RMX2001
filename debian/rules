@@ -7,3 +7,12 @@ include /usr/share/linux-packaging-snippets/kernel-snippet.mk
 
 override_dh_dwz:
 override_dh_strip:
+
+# linux-packaging-snippets v45 builds init_boot unconditionally. Header v2
+# devices have no init_boot partition, and mkbootimg rejects that synthetic
+# image because it has no DTB. Provide the unused target without invoking
+# mkbootimg; DEVICE_HAS_INIT_BOOT=0 keeps it out of the package.
+ifeq ($(DEVICE_HAS_INIT_BOOT),0)
+out/KERNEL_OBJ/init_boot-default.img: out/KERNEL_OBJ/initramfs.default
+	touch $@
+endif
