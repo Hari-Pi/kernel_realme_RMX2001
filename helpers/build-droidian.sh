@@ -93,6 +93,7 @@ docker run --rm \
 grep -Eq '^DEVICE_HAS_INIT_BOOT[[:space:]]*=[[:space:]]*0([[:space:]]*)$' "$root/debian/kernel-info.mk" || die 'DEVICE_HAS_INIT_BOOT must be 0'
 grep -Eq '^KERNEL_BOOTIMAGE_VERSION[[:space:]]*=[[:space:]]*2([[:space:]]*)$' "$root/debian/kernel-info.mk" || die 'boot header version must be 2'
 grep -Fqx "KERNEL_BOOTIMAGE_CMDLINE = $BOOT_CMDLINE" "$root/debian/kernel-info.mk" || die 'boot command line does not match the validated RMX2001 layout'
+grep -Eq '^FLASH_IS_AONLY[[:space:]]*=[[:space:]]*1([[:space:]]*)$' "$root/debian/kernel-info.mk" || die 'RMX2001 flashing must use the A-only boot partition layout'
 grep -Eq '^CLANG_VERSION[[:space:]]*=[[:space:]]*6\.0-4691093([[:space:]]*)$' "$root/debian/kernel-info.mk" || die 'CLANG_VERSION must select Droidian Clang 6'
 grep -Eq '^BUILD_PATH[[:space:]]*=[[:space:]]*/usr/lib/llvm-android-6\.0-4691093/bin([[:space:]]*)$' "$root/debian/kernel-info.mk" || die 'BUILD_PATH must use Droidian packaged Clang 6'
 grep -q '^out/KERNEL_OBJ/init_boot-default\.img:' "$root/debian/rules" || die 'header-v2 init_boot workaround is missing'
@@ -219,7 +220,13 @@ docker run --rm \
         echo "Extracting boot image from $(basename "$package")."
         dpkg-deb -x "$package" "$extract"
         boot="$extract/boot/boot.img-$ABI"
+        flash_config="$extract/lib/flash-bootimage/$ABI.conf"
         test -s "$boot"
+        test -s "$flash_config"
+        grep -Fqx "DEVICE_IS_AB=no" "$flash_config"
+        grep -Fqx "BOOTIMAGE_SLOT_A=\"/dev/disk/by-partlabel/boot\"" "$flash_config"
+        grep -Fqx "DEVICE_HAS_DTBO_PARTITION=no" "$flash_config"
+        grep -Fqx "DEVICE_HAS_VBMETA_PARTITION=no" "$flash_config"
         size=$(stat -c %s "$boot")
         test "$size" -le "$BOOT_PARTITION_SIZE"
         test "$(dd if="$boot" bs=8 count=1 status=none)" = "ANDROID!"
