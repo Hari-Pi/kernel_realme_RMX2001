@@ -8,6 +8,7 @@ readonly KEY_SHA256='0f8014a75ed6ef25ee00fa8f6142290ee1679fe0c701b48b71ed6e9c57b
 readonly KEY_FINGERPRINT='B03DFCE15F8CCC2B3F4B65945E775B2A27AB0C94'
 readonly ABI='4.14.141-realme-rmx2001'
 readonly BOOT_PARTITION_SIZE='33554432'
+readonly BOOT_CMDLINE='bootopt=64S3,32N2,64N2 buildvariant=userdebug droidian.lvm.prefer systemd.unified_cgroup_hierarchy=0'
 
 root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 mode=build
@@ -81,6 +82,7 @@ docker run --rm \
 [[ -f $root/arch/arm64/boot/dts/mediatek/mt6785.dts ]] || die 'mt6785.dts is missing'
 grep -Eq '^DEVICE_HAS_INIT_BOOT[[:space:]]*=[[:space:]]*0([[:space:]]*)$' "$root/debian/kernel-info.mk" || die 'DEVICE_HAS_INIT_BOOT must be 0'
 grep -Eq '^KERNEL_BOOTIMAGE_VERSION[[:space:]]*=[[:space:]]*2([[:space:]]*)$' "$root/debian/kernel-info.mk" || die 'boot header version must be 2'
+grep -Fqx "KERNEL_BOOTIMAGE_CMDLINE = $BOOT_CMDLINE" "$root/debian/kernel-info.mk" || die 'boot command line does not match the validated RMX2001 layout'
 grep -Eq '^CLANG_VERSION[[:space:]]*=[[:space:]]*6\.0-4691093([[:space:]]*)$' "$root/debian/kernel-info.mk" || die 'CLANG_VERSION must select Droidian Clang 6'
 grep -Eq '^BUILD_PATH[[:space:]]*=[[:space:]]*/usr/lib/llvm-android-6\.0-4691093/bin([[:space:]]*)$' "$root/debian/kernel-info.mk" || die 'BUILD_PATH must use Droidian packaged Clang 6'
 grep -q '^out/KERNEL_OBJ/init_boot-default\.img:' "$root/debian/rules" || die 'header-v2 init_boot workaround is missing'
@@ -154,6 +156,7 @@ docker run --rm \
     -e KEY_FINGERPRINT="$KEY_FINGERPRINT" \
     -e ABI="$ABI" \
     -e BOOT_PARTITION_SIZE="$BOOT_PARTITION_SIZE" \
+    -e BOOT_CMDLINE="$BOOT_CMDLINE" \
     -v "$artifact_directory:/buildd" \
     -v "$build_tree/source:/buildd/sources" \
     -v "$key_file:/tmp/droidian.gpg:ro" \
@@ -210,6 +213,22 @@ docker run --rm \
         size=$(stat -c %s "$boot")
         test "$size" -le "$BOOT_PARTITION_SIZE"
         test "$(dd if="$boot" bs=8 count=1 status=none)" = "ANDROID!"
+        audit=$(mktemp -d)
+        header=$(unpack_bootimg --boot_img "$boot" --out "$audit" 2>&1)
+        printf "%s\n" "$header"
+        printf "%s\n" "$header" | grep -Fqx "boot image header version: 2"
+        printf "%s\n" "$header" | grep -Fqx "page size: 2048"
+        printf "%s\n" "$header" | grep -Fqx "kernel load address: 0x40080000"
+        printf "%s\n" "$header" | grep -Fqx "ramdisk load address: 0x47c80000"
+        printf "%s\n" "$header" | grep -Fqx "kernel tags load address: 0x4bc80000"
+        printf "%s\n" "$header" | grep -Fqx "dtb address: 0x000000004bc80000"
+        printf "%s\n" "$header" | grep -Fqx "command line args: $BOOT_CMDLINE"
+        test -s "$audit/kernel"
+        test -s "$audit/ramdisk"
+        test -s "$audit/dtb"
+        test "$(od -An -tx1 -N2 "$audit/kernel" | tr -d " \n")" = 1f8b
+        test "$(od -An -tx1 -N2 "$audit/ramdisk" | tr -d " \n")" = 1f8b
+        test "$(od -An -tx1 -N4 "$audit/dtb" | tr -d " \n")" = d00dfeed
         install -m 0644 "$boot" /buildd/boot.img
         dpkg-deb --info "$package" > /buildd/package-info.txt
         dpkg-deb --contents "$package" > /buildd/package-contents.txt
