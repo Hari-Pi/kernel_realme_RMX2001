@@ -283,11 +283,18 @@ EOF
 
 deb="$artifact_directory/${package}_${version}_arm64.deb"
 note 'building guarded boot-only Debian package'
-dpkg-deb --root-owner-group --build "$package_root" "$deb"
+if ! dpkg-deb --root-owner-group --build "$package_root" "$deb"; then
+    note 'dpkg-deb subprocess failed once; removing the partial archive and retrying'
+    rm -f "$deb"
+    sleep 2
+    dpkg-deb --root-owner-group --build "$package_root" "$deb"
+fi
 
 audit_root="$cleanup_root/package-audit"
 dpkg-deb -e "$deb" "$audit_root/control"
 dpkg-deb -x "$deb" "$audit_root/data"
+sh -n "$audit_root/control/preinst"
+sh -n "$audit_root/control/postinst"
 cmp "$audit_root/data/boot/boot.img-$ABI" "$candidate"
 [[ ! -e $audit_root/data/boot/recovery.img-$ABI ]] || die 'package unexpectedly contains a recovery image'
 grep -Fq 'target=/dev/disk/by-partlabel/boot' "$audit_root/control/postinst"
