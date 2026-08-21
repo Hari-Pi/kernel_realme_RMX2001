@@ -136,8 +136,14 @@ trap cleanup EXIT
 
 if [[ -n $compiler_artifact_input ]]; then
     compiler_artifact=$(cd "$compiler_artifact_input" && pwd)
-    grep -Fqx "Source commit: $source_commit" "$compiler_artifact/MANIFEST.txt" ||
-        die 'compiler artifact source commit does not match the current source'
+    compiler_source_commit=$(sed -n 's/^Source commit: //p' "$compiler_artifact/MANIFEST.txt")
+    [[ $compiler_source_commit =~ ^[0-9a-f]{40}$ ]] || die 'compiler artifact has an invalid source commit'
+    git -C "$root" merge-base --is-ancestor "$compiler_source_commit" "$source_commit" ||
+        die 'compiler artifact is not an ancestor of the current source'
+    git -C "$root" diff --quiet "$compiler_source_commit" "$source_commit" -- . \
+        ':(exclude)helpers/build-magiskboot-deb.sh' \
+        ':(exclude)helpers/BUILDING.md' ||
+        die 'kernel or compiler inputs changed after the reused artifact was built'
     note "reusing verified compiler artifact: $compiler_artifact"
 else
     note 'compiling raw kernel with the pinned Droidian toolchain'
@@ -146,6 +152,7 @@ else
     "$root/build.sh" "${compile_args[@]}"
     compiler_artifact=$(find "$compile_root" -mindepth 1 -maxdepth 1 -type d -print)
     [[ -n $compiler_artifact && $compiler_artifact != *$'\n'* ]] || die 'expected exactly one compiler artifact directory'
+    compiler_source_commit=$source_commit
 fi
 raw_kernel="$compiler_artifact/kernel-Image"
 [[ -s $raw_kernel ]] || die 'compiler did not publish the raw kernel Image'
@@ -296,6 +303,7 @@ dpkg-deb --contents "$deb" > "$artifact_directory/package-contents.txt"
 cat > "$artifact_directory/MANIFEST.txt" <<EOF
 Build ID: $build_id
 Source commit: $source_commit
+Compiled source commit: $compiler_source_commit
 Compiler artifact: $compiler_artifact
 Stock boot SHA-256: $STOCK_SHA256
 Stock boot size: $BOOT_SIZE bytes
