@@ -300,6 +300,7 @@ done
 [[ $package_built -eq 1 ]] || die 'dpkg-deb failed to produce a readable package after two attempts'
 
 audit_root="$cleanup_root/package-audit"
+mkdir -p "$audit_root"
 dpkg-deb -e "$deb" "$audit_root/control"
 dpkg-deb -x "$deb" "$audit_root/data"
 sh -n "$audit_root/control/preinst"
