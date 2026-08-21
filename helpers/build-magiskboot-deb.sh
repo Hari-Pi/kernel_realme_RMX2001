@@ -127,10 +127,12 @@ cleanup_root=$(mktemp -d "$(dirname "$root")/.rmx2001-magiskboot.XXXXXX")
 package_root=
 cleanup() {
     status=$?
+    trap - EXIT
     if [[ $status -ne 0 && -n ${package_root:-} && -d $package_root ]]; then
-        cp -a "$package_root" "$artifact_directory/FAILED-package-root"
+        cp -a "$package_root" "$artifact_directory/FAILED-package-root" || true
     fi
-    rm -rf -- "$cleanup_root"
+    rm -rf -- "$cleanup_root" || true
+    exit "$status"
 }
 trap cleanup EXIT
 
@@ -283,12 +285,19 @@ EOF
 
 deb="$artifact_directory/${package}_${version}_arm64.deb"
 note 'building guarded boot-only Debian package'
-if ! dpkg-deb --root-owner-group --build "$package_root" "$deb"; then
-    note 'dpkg-deb subprocess failed once; removing the partial archive and retrying'
+package_built=0
+for attempt in 1 2; do
     rm -f "$deb"
+    if dpkg-deb --root-owner-group --build "$package_root" "$deb" &&
+        dpkg-deb --info "$deb" >/dev/null 2>&1; then
+        package_built=1
+        break
+    fi
+    [[ $attempt -eq 1 ]] || break
+    note 'dpkg-deb produced an unreadable archive once; retrying after a short pause'
     sleep 2
-    dpkg-deb --root-owner-group --build "$package_root" "$deb"
-fi
+done
+[[ $package_built -eq 1 ]] || die 'dpkg-deb failed to produce a readable package after two attempts'
 
 audit_root="$cleanup_root/package-audit"
 dpkg-deb -e "$deb" "$audit_root/control"
