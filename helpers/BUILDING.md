@@ -67,3 +67,7 @@ The package contains no recovery image and does not request a reboot. Building
 it never accesses or modifies a phone. Its install scripts only accept the
 known-good stock boot hash, create and verify a full rollback image, write the
 full 32 MiB candidate, and verify the partition after writing.
+
+For packaging diagnostics, `--compiler-artifact DIR` reuses a completed,
+commit-matched compiler artifact. Normal runs do not use this option and always
+compile from source first.

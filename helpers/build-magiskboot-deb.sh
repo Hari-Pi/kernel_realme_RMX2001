@@ -14,6 +14,7 @@ jobs=${JOBS:-}
 stock_boot=${STOCK_BOOT_IMAGE:-}
 magiskboot=${MAGISKBOOT:-}
 output_root=${OUTPUT_DIR:-"$(dirname "$root")/rmx2001-magiskboot-artifacts"}
+compiler_artifact_input=
 
 usage() {
     cat <<'EOF'
@@ -29,6 +30,8 @@ Options:
   --jobs N           Limit build CPUs (default: all available host CPUs)
   --stock-boot FILE  Known-good 32 MiB stock boot image
   --magiskboot FILE  Pinned x86_64 MagiskBoot binary
+  --compiler-artifact DIR
+                     Reuse a verified compiler artifact instead of recompiling
   --output DIR       Artifact root outside the source tree
   -h, --help         Show this help
 
@@ -64,6 +67,7 @@ while (($#)); do
         --jobs) (($# >= 2)) || die '--jobs requires a value'; jobs=$2; shift 2 ;;
         --stock-boot) (($# >= 2)) || die '--stock-boot requires a file'; stock_boot=$2; shift 2 ;;
         --magiskboot) (($# >= 2)) || die '--magiskboot requires a file'; magiskboot=$2; shift 2 ;;
+        --compiler-artifact) (($# >= 2)) || die '--compiler-artifact requires a directory'; compiler_artifact_input=$2; shift 2 ;;
         --output) (($# >= 2)) || die '--output requires a directory'; output_root=$2; shift 2 ;;
         -h|--help) usage; exit 0 ;;
         *) die "unknown option: $1" ;;
@@ -120,15 +124,29 @@ compile_root="$artifact_directory/compiler"
 mkdir "$artifact_directory"
 
 cleanup_root=$(mktemp -d "$(dirname "$root")/.rmx2001-magiskboot.XXXXXX")
-cleanup() { rm -rf -- "$cleanup_root"; }
+package_root=
+cleanup() {
+    status=$?
+    if [[ $status -ne 0 && -n ${package_root:-} && -d $package_root ]]; then
+        cp -a "$package_root" "$artifact_directory/FAILED-package-root"
+    fi
+    rm -rf -- "$cleanup_root"
+}
 trap cleanup EXIT
 
-note 'compiling raw kernel with the pinned Droidian toolchain'
-compile_args=(--jobs "$jobs" --output "$compile_root")
-[[ $allow_dirty -eq 0 ]] || compile_args+=(--allow-dirty)
-"$root/build.sh" "${compile_args[@]}"
-compiler_artifact=$(find "$compile_root" -mindepth 1 -maxdepth 1 -type d -print)
-[[ -n $compiler_artifact && $compiler_artifact != *$'\n'* ]] || die 'expected exactly one compiler artifact directory'
+if [[ -n $compiler_artifact_input ]]; then
+    compiler_artifact=$(cd "$compiler_artifact_input" && pwd)
+    grep -Fqx "Source commit: $source_commit" "$compiler_artifact/MANIFEST.txt" ||
+        die 'compiler artifact source commit does not match the current source'
+    note "reusing verified compiler artifact: $compiler_artifact"
+else
+    note 'compiling raw kernel with the pinned Droidian toolchain'
+    compile_args=(--jobs "$jobs" --output "$compile_root")
+    [[ $allow_dirty -eq 0 ]] || compile_args+=(--allow-dirty)
+    "$root/build.sh" "${compile_args[@]}"
+    compiler_artifact=$(find "$compile_root" -mindepth 1 -maxdepth 1 -type d -print)
+    [[ -n $compiler_artifact && $compiler_artifact != *$'\n'* ]] || die 'expected exactly one compiler artifact directory'
+fi
 raw_kernel="$compiler_artifact/kernel-Image"
 [[ -s $raw_kernel ]] || die 'compiler did not publish the raw kernel Image'
 [[ $(od -An -tx1 -j56 -N4 "$raw_kernel" | tr -d ' \n') == '41524d64' ]] || die 'raw kernel Image has invalid arm64 magic'
