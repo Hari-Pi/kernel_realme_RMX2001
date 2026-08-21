@@ -246,6 +246,10 @@ docker run --rm \
         test "$(od -An -tx1 -N2 "$audit/kernel" | tr -d " \n")" = 1f8b
         test "$(od -An -tx1 -N2 "$audit/ramdisk" | tr -d " \n")" = 1f8b
         test "$(od -An -tx1 -N4 "$audit/dtb" | tr -d " \n")" = d00dfeed
+        raw_kernel=/buildd/sources/out/KERNEL_OBJ/arch/arm64/boot/Image
+        test -s "$raw_kernel"
+        test "$(od -An -tx1 -j56 -N4 "$raw_kernel" | tr -d " \n")" = 41524d64
+        install -m 0644 "$raw_kernel" /buildd/kernel-Image
         install -m 0644 "$boot" /buildd/boot.img
         dpkg-deb --info "$package" > /buildd/package-info.txt
         dpkg-deb --contents "$package" > /buildd/package-contents.txt
@@ -257,9 +261,11 @@ docker run --rm \
     ' 2>&1 | tee "$artifact_directory/build.log"
 
 boot="$artifact_directory/boot.img"
+raw_kernel="$artifact_directory/kernel-Image"
 package=$(find "$artifact_directory" -maxdepth 1 -type f -name "linux-bootimage-${ABI}_*_arm64.deb" -print)
 [[ -n $package && $package != *$'\n'* ]] || die 'expected exactly one boot-image package'
 [[ $(dd if="$boot" bs=8 count=1 status=none) == 'ANDROID!' ]] || die 'final boot image header check failed'
+[[ $(od -An -tx1 -j56 -N4 "$raw_kernel" | tr -d ' \n') == '41524d64' ]] || die 'final raw kernel header check failed'
 
 source_commit=$(git -C "$root" rev-parse HEAD)
 source_state=clean
@@ -272,6 +278,9 @@ Container: $IMAGE
 Container image ID: $IMAGE_ID
 linux-packaging-snippets: $SNIPPETS_VERSION
 Compiler: $(cat "$artifact_directory/compiler.version")
+Raw kernel: $(basename "$raw_kernel")
+Raw kernel size: $(stat -c %s "$raw_kernel") bytes
+Raw kernel SHA-256: $(sha256sum "$raw_kernel" | awk '{print $1}')
 Boot image: $(basename "$boot")
 Boot image size: $(stat -c %s "$boot") bytes
 Boot partition limit: $BOOT_PARTITION_SIZE bytes
@@ -280,7 +289,7 @@ Package: $(basename "$package")
 Package SHA-256: $(sha256sum "$package" | awk '{print $1}')
 Status: built and structurally verified; not boot-tested
 EOF
-(cd "$artifact_directory" && sha256sum boot.img linux-bootimage-*.deb package-info.txt package-contents.txt compiler.version linux-packaging-snippets.version MANIFEST.txt > SHA256SUMS)
+(cd "$artifact_directory" && sha256sum kernel-Image boot.img linux-bootimage-*.deb package-info.txt package-contents.txt compiler.version linux-packaging-snippets.version MANIFEST.txt > SHA256SUMS)
 rm -f "$artifact_directory/FAILED.txt"
 build_succeeded=1
 

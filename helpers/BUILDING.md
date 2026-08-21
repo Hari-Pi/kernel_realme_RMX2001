@@ -40,3 +40,30 @@ or success manifest is retained in that artifact directory.
 
 The result is structurally verified but deliberately labelled **not
 boot-tested**. A successful build is not evidence that the phone can boot it.
+
+## Stock-layout MagiskBoot package
+
+`helpers/build-magiskboot-deb.sh` uses the same pinned compiler, but discards
+the generated Droidian boot image. It replaces only the kernel inside the
+validated 32 MiB stock image using a pinned MagiskBoot binary, re-unpacks the
+result, and byte-compares the preserved ramdisk, DTB, and kernel DTB before
+creating a guarded boot-only Debian package.
+
+On the established build host, both inputs are discovered automatically:
+
+```sh
+./helpers/build-magiskboot-deb.sh
+```
+
+On another host, provide them explicitly:
+
+```sh
+./helpers/build-magiskboot-deb.sh \
+  --stock-boot /path/to/known-good-boot.img \
+  --magiskboot /path/to/magiskboot
+```
+
+The package contains no recovery image and does not request a reboot. Building
+it never accesses or modifies a phone. Its install scripts only accept the
+known-good stock boot hash, create and verify a full rollback image, write the
+full 32 MiB candidate, and verify the partition after writing.
