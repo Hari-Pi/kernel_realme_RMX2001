@@ -40,7 +40,7 @@ struct uts_namespace init_uts_ns = {
 };
 EXPORT_SYMBOL_GPL(init_uts_ns);
 
-#define RMX2001_BUILD_MARKER " [RMX2001 idle-log-v2-official 2026-08-21]"
+#define RMX2001_BUILD_MARKER " [RMX2001 mcdi-heartbeat-v3 2026-08-28]"
 
 /* FIXED STRINGS! Don't touch! */
 const char linux_banner[] =
