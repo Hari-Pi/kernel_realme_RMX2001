@@ -3,6 +3,10 @@
 The supported entry point is `./build.sh`. It follows Droidian's Debian kernel
 packaging flow and never flashes a device.
 
+For the complete optimization, MagiskBoot packaging, package-audit, rollback,
+installation, and real-device test process, see
+[KERNEL-OPTIMIZATION-WORKFLOW.md](KERNEL-OPTIMIZATION-WORKFLOW.md).
+
 ## Requirements
 
 - Linux x86_64 host (WSL 2 is supported)
