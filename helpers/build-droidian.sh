@@ -3,7 +3,7 @@ set -Eeuo pipefail
 
 readonly IMAGE='quay.io/droidian/build-essential@sha256:53a9ebae9787b2d74c56974ae9b0727aae81409fdff612aca1f97b1083c9fd49'
 readonly IMAGE_ID='sha256:cc97ed18ab572816258ee104bbf5433c50e9e00dadfb5251c273be0b0f17247b'
-readonly SNIPPETS_VERSION='45+git20260713160329.54d2db9.next.production'
+readonly SNIPPETS_VERSION='49+git20260824222026.46633f1.next.production'
 readonly KEY_SHA256='0f8014a75ed6ef25ee00fa8f6142290ee1679fe0c701b48b71ed6e9c57b32f60'
 readonly KEY_FINGERPRINT='B03DFCE15F8CCC2B3F4B65945E775B2A27AB0C94'
 readonly ABI='4.14.141-realme-rmx2001'
