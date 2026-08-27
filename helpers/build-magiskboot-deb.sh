@@ -5,6 +5,7 @@ readonly ABI='4.14.141-realme-rmx2001'
 readonly DEVICE='RMX2001'
 readonly BOOT_SIZE='33554432'
 readonly STOCK_SHA256='ce5d48e4802398ceb2cd0dd8c84e04dd944cac08bb540ace87f1c26a9ffe14c2'
+readonly TESTED_V2_SHA256='befcdf3e000d008723bacc2feacc5fbc7ad09e2c8d4be85790182c4167cf6f31'
 readonly MAGISKBOOT_SHA256='a18ecbd7981179494b7d281453d6c4e25b5c719e7d2ef7f6eba3c6be3043c58e'
 
 root=$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
@@ -224,7 +225,8 @@ cat > "$package_root/DEBIAN/preinst" <<EOF
 #!/bin/sh
 set -eu
 target=/dev/disk/by-partlabel/boot
-expected_current=$STOCK_SHA256
+expected_stock=$STOCK_SHA256
+expected_v2=$TESTED_V2_SHA256
 expected_size=$BOOT_SIZE
 record=/run/rmx2001-magiskboot-kernel-backup
 [ "\$1" = install ] || [ "\$1" = upgrade ] || exit 0
@@ -233,12 +235,15 @@ record=/run/rmx2001-magiskboot-kernel-backup
 [ -b "\$target" ] || { echo 'Refusing: boot partition not found.' >&2; exit 1; }
 [ "\$(blockdev --getsize64 "\$target")" = "\$expected_size" ] || { echo 'Refusing: boot partition size mismatch.' >&2; exit 1; }
 current=\$(sha256sum "\$target" | awk '{print \$1}')
-[ "\$current" = "\$expected_current" ] || { echo "Refusing: current boot SHA-256 is not known-good: \$current" >&2; exit 1; }
+case "\$current" in
+    "\$expected_stock"|"\$expected_v2") ;;
+    *) echo "Refusing: current boot SHA-256 is not known-good: \$current" >&2; exit 1 ;;
+esac
 backup=/userdata/kernel-backups/pre-magiskboot-kernel-\$(date -u +%Y%m%dT%H%M%SZ).img
 install -d -m 700 /userdata/kernel-backups
 dd if="\$target" of="\$backup" bs=1M status=none
 sync
-[ "\$(sha256sum "\$backup" | awk '{print \$1}')" = "\$expected_current" ] || { rm -f "\$backup"; echo 'Refusing: backup verification failed.' >&2; exit 1; }
+[ "\$(sha256sum "\$backup" | awk '{print \$1}')" = "\$current" ] || { rm -f "\$backup"; echo 'Refusing: backup verification failed.' >&2; exit 1; }
 chmod 600 "\$backup"
 printf '%s\n' "\$backup" > "\$record"
 echo "Verified rollback image: \$backup"
@@ -279,8 +284,9 @@ chmod 0755 "$package_root/DEBIAN/preinst" "$package_root/DEBIAN/postinst"
 cat > "$package_root/usr/share/doc/$package/README.magiskboot" <<EOF
 This package contains a boot image made by replacing only the kernel inside the
 validated stock RMX2001 boot image with MagiskBoot. Recovery is not included or
-modified. Installation requires the boot partition to match the known-good
-stock SHA-256 and creates a verified backup before writing. It does not reboot.
+modified. Installation requires the boot partition to match either the
+known-good stock SHA-256 or the tested v2 SHA-256, and creates a verified
+backup of whichever image is present before writing. It does not reboot.
 EOF
 
 deb="$artifact_directory/${package}_${version}_arm64.deb"
@@ -309,6 +315,9 @@ cmp "$audit_root/data/boot/boot.img-$ABI" "$candidate"
 [[ ! -e $audit_root/data/boot/recovery.img-$ABI ]] || die 'package unexpectedly contains a recovery image'
 grep -Fq 'target=/dev/disk/by-partlabel/boot' "$audit_root/control/postinst"
 grep -Fq "expected_hash=$candidate_hash" "$audit_root/control/postinst"
+grep -Fq "expected_stock=$STOCK_SHA256" "$audit_root/control/preinst"
+grep -Fq "expected_v2=$TESTED_V2_SHA256" "$audit_root/control/preinst"
+grep -Fq 'Refusing: current boot SHA-256 is not known-good' "$audit_root/control/preinst"
 
 install -m 0644 "$raw_kernel" "$artifact_directory/kernel-Image"
 install -m 0644 "$stock_unpack/unpack-stock.log" "$artifact_directory/unpack-stock.log"
@@ -330,6 +339,8 @@ Candidate boot SHA-256: $candidate_hash
 Candidate boot size: $(stat -c %s "$candidate") bytes
 Package: $(basename "$deb")
 Package SHA-256: $(hash_file "$deb")
+Accepted predecessor SHA-256 (stock): $STOCK_SHA256
+Accepted predecessor SHA-256 (tested v2): $TESTED_V2_SHA256
 Preserved byte-for-byte: ramdisk.cpio, dtb, kernel_dtb
 Boot layout source: MagiskBoot repack of the validated stock image
 Recovery image included: no
