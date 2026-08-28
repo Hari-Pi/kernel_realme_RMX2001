@@ -23,20 +23,23 @@ session that created the tooling.
 
 ## Current validated baseline
 
-The following state was verified on the phone on 2026-08-28 after a later reboot
-and more than one day of uptime:
+The following state was verified on the phone on 2026-08-28 after the MCDI
+heartbeat and BBR/fq candidate completed a guarded installation and reboot:
 
 | Item | Value |
 | --- | --- |
 | Kernel ABI | `4.14.141-realme-rmx2001` |
-| Running marker | `RMX2001 idle-log-v2-official 2026-08-21` |
-| Installed boot package | `0.0.0+magiskboot.git20260821140314.73c0d48656d8` |
-| Running boot SHA-256 | `befcdf3e000d008723bacc2feacc5fbc7ad09e2c8d4be85790182c4167cf6f31` |
+| Source commit | `2b74e274ae46ae37507fe859fb61e8e521bf413f` |
+| Running marker | `RMX2001 mcdi-v3-bbr-fq 2026-08-28` |
+| Installed boot package | `0.0.0+magiskboot.git20260827231134.2b74e274ae46` |
+| Running boot SHA-256 | `0b7d5682dc120a26acb307dc38e590f470d4b9d3c8731d7c55f23dc32b408fea` |
 | Recovery SHA-256 | `55d75023630495d2f9018d46b8fd836bca8eae66b2ee9c251a21ca09338806f6` |
 | Validated stock boot SHA-256 | `ce5d48e4802398ceb2cd0dd8c84e04dd944cac08bb540ace87f1c26a9ffe14c2` |
 | Pinned MagiskBoot SHA-256 | `a18ecbd7981179494b7d281453d6c4e25b5c719e7d2ef7f6eba3c6be3043c58e` |
 
 The complete test history is in [KERNEL-TESTS.md](KERNEL-TESTS.md).
+The server's package sources and upgrade constraints are recorded in
+[SERVER-APT-REPOSITORIES.md](SERVER-APT-REPOSITORIES.md).
 
 ## Build host layout
 
