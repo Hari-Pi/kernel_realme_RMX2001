@@ -204,10 +204,12 @@ Review the non-removing plan:
 apt-get --simulate upgrade
 ```
 
-At the time of assessment, ordinary upgrade proposed no changes:
+After the controlled repository repair and validation documented in
+[DIST-UPGRADE-EXECUTION-2026-08-28.md](DIST-UPGRADE-EXECUTION-2026-08-28.md),
+both ordinary and full upgrade simulations proposed no changes:
 
 ```text
-0 upgraded, 0 newly installed, 0 to remove and 14 not upgraded
+0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
 ```
 
 Always inspect, but do not execute, the distribution plan remotely:
