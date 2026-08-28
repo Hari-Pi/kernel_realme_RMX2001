@@ -10,6 +10,9 @@ installation, and real-device test process, see
 The server's Droidian and Tailscale APT configuration is documented in
 [SERVER-APT-REPOSITORIES.md](SERVER-APT-REPOSITORIES.md).
 
+The remote recovery limits of a distribution upgrade are analyzed in
+[DIST-UPGRADE-SAFETY.md](DIST-UPGRADE-SAFETY.md).
+
 ## Requirements
 
 - Linux x86_64 host (WSL 2 is supported)
