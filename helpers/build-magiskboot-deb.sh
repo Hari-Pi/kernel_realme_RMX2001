@@ -36,9 +36,9 @@ Options:
   --output DIR       Artifact root outside the source tree
   -h, --help         Show this help
 
-On the established build host, stock boot and MagiskBoot are discovered from
-/home/dazai/kernel-build automatically. This script never installs the package,
-flashes a partition, reboots a device, or includes a recovery image.
+Inputs may also be supplied through STOCK_BOOT_IMAGE and MAGISKBOOT. MagiskBoot
+is discovered on PATH when --magiskboot is omitted. This script never installs
+the package, flashes a partition, reboots a device, or includes recovery.
 EOF
 }
 
@@ -78,15 +78,8 @@ done
 [[ -n $jobs ]] || jobs=$(detect_jobs)
 [[ $jobs =~ ^[1-9][0-9]*$ ]] || die '--jobs must be a positive integer'
 
-if [[ -z $stock_boot && -f /home/dazai/kernel-build/input/stock-boot.img ]]; then
-    stock_boot=/home/dazai/kernel-build/input/stock-boot.img
-fi
-if [[ -z $magiskboot ]]; then
-    if command -v magiskboot >/dev/null 2>&1; then
-        magiskboot=$(command -v magiskboot)
-    elif [[ -x /home/dazai/kernel-build/tools/magisk-v30.7/magiskboot ]]; then
-        magiskboot=/home/dazai/kernel-build/tools/magisk-v30.7/magiskboot
-    fi
+if [[ -z $magiskboot ]] && command -v magiskboot >/dev/null 2>&1; then
+    magiskboot=$(command -v magiskboot)
 fi
 
 stock_boot=$(resolve_file "${stock_boot:-}") || die 'known-good stock boot image not found; use --stock-boot FILE'
@@ -212,7 +205,7 @@ cat > "$package_root/DEBIAN/control" <<EOF
 Package: $package
 Version: $version
 Architecture: arm64
-Maintainer: Hari Pi <noreply@hari-pi.com>
+Maintainer: RMX2001 Droidian Maintainers <noreply@localhost>
 Pre-Depends: coreutils, util-linux
 Section: kernel
 Priority: optional
