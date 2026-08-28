@@ -1,86 +1,71 @@
-# Building the RMX2001 Droidian boot image
-
-The supported entry point is `./build.sh`. It follows Droidian's Debian kernel
-packaging flow and never flashes a device.
-
-For the complete optimization, MagiskBoot packaging, package-audit, rollback,
-installation, and real-device test process, see
-[KERNEL-OPTIMIZATION-WORKFLOW.md](KERNEL-OPTIMIZATION-WORKFLOW.md).
-
-The server's Droidian and Tailscale APT configuration is documented in
-[SERVER-APT-REPOSITORIES.md](SERVER-APT-REPOSITORIES.md).
-
-The remote recovery limits of a distribution upgrade are analyzed in
-[DIST-UPGRADE-SAFETY.md](DIST-UPGRADE-SAFETY.md).
-
-The first controlled package repair and reboot validation is recorded in
-[DIST-UPGRADE-EXECUTION-2026-08-28.md](DIST-UPGRADE-EXECUTION-2026-08-28.md).
+# Building the RMX2001 Droidian boot package
 
 ## Requirements
 
 - Linux x86_64 host (WSL 2 is supported)
 - Docker daemon access
 - Git and at least 25 GiB free space
+- validated 32 MiB stock boot image
+- pinned x86_64 MagiskBoot binary
 
-The Droidian archive public key is bundled in `helpers/keys/` and is verified
-against its pinned checksum and fingerprint before use.
+The Droidian archive public key is bundled in `helpers/keys/` and verified
+against its pinned checksum and fingerprint before use. Build artifacts are
+written outside the source tree.
 
-Run checks only:
+## Guarded package
+
+Validate the complete environment without compiling:
 
 ```sh
-./build.sh --check-only
+./helpers/build-magiskboot-deb.sh --check-only
 ```
 
-Build packages and extract a verified `boot.img`:
-
-```sh
-./build.sh
-```
-
-By default the build uses every CPU available to the host. Use `--jobs N` only
-when you intentionally want to limit it. `--key FILE` remains available when
-CI keeps another copy of the same pinned key elsewhere.
-
-Artifacts are written outside the source tree to
-`../rmx2001-kernel-artifacts/<timestamp>-<commit>/`. Every build includes the
-boot-image Debian package, extracted `boot.img`, build log, package inventory,
-tool versions, manifest, and SHA-256 checksums.
-
-The verifier checks the Android magic, partition-size limit, header version,
-page size, load addresses, kernel command line, gzip kernel and ramdisk, and DTB
-magic. If any step fails, the run is marked with `FAILED.txt` and no `boot.img`
-or success manifest is retained in that artifact directory.
-
-The result is structurally verified but deliberately labelled **not
-boot-tested**. A successful build is not evidence that the phone can boot it.
-
-## Stock-layout MagiskBoot package
-
-`helpers/build-magiskboot-deb.sh` uses the same pinned compiler, but discards
-the generated Droidian boot image. It replaces only the kernel inside the
-validated 32 MiB stock image using a pinned MagiskBoot binary, re-unpacks the
-result, and byte-compares the preserved ramdisk, DTB, and kernel DTB before
-creating a guarded boot-only Debian package.
-
-On the established build host, both inputs are discovered automatically:
+Compile and create the guarded Debian package:
 
 ```sh
 ./helpers/build-magiskboot-deb.sh
 ```
 
-On another host, provide them explicitly:
+On another host, provide the validated inputs explicitly:
 
 ```sh
 ./helpers/build-magiskboot-deb.sh \
-  --stock-boot /path/to/known-good-boot.img \
+  --stock-boot /path/to/stock-boot.img \
   --magiskboot /path/to/magiskboot
 ```
 
-The package contains no recovery image and does not request a reboot. Building
-it never accesses or modifies a phone. Its install scripts only accept the
-known-good stock boot hash, create and verify a full rollback image, write the
-full 32 MiB candidate, and verify the partition after writing.
+The helper uses every available CPU by default. Use `--jobs N` to limit it.
+`--compiler-artifact DIR` may reuse a completed, commit-matched compiler
+artifact for packaging diagnostics; normal builds compile from source.
 
-For packaging diagnostics, `--compiler-artifact DIR` reuses a completed,
-commit-matched compiler artifact. Normal runs do not use this option and always
-compile from source first.
+The package replaces only the kernel inside the known-good stock layout. It
+byte-compares the preserved ramdisk, DTB, and kernel DTB, contains no recovery
+image, does not request a reboot, and never accesses the phone while building.
+Its install scripts verify the target device and stock boot hash, create a full
+rollback image, write the complete 32 MiB candidate, and verify the partition.
+
+Artifacts are stored under:
+
+```text
+../rmx2001-magiskboot-artifacts/<timestamp>-<commit>/
+```
+
+Each successful directory contains the Debian package, extracted boot image,
+compiler artifact reference, audits, manifest, and SHA-256 checksums.
+
+## Native compiler backend
+
+`./build.sh` creates the native Droidian compiler artifact consumed by the
+guarded packager. It can also be checked independently:
+
+```sh
+./build.sh --check-only
+```
+
+Its generated boot image is structurally verified but deliberately marked as
+not boot-tested. Do not deploy it directly.
+
+The complete installation and device-test process is in
+[KERNEL-OPTIMIZATION-WORKFLOW.md](KERNEL-OPTIMIZATION-WORKFLOW.md). Server APT
+and distribution-upgrade policy is in
+[SERVER-MAINTENANCE.md](SERVER-MAINTENANCE.md).

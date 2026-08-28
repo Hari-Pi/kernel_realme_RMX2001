@@ -39,7 +39,7 @@ heartbeat and BBR/fq candidate completed a guarded installation and reboot:
 
 The complete test history is in [KERNEL-TESTS.md](KERNEL-TESTS.md).
 The server's package sources and upgrade constraints are recorded in
-[SERVER-APT-REPOSITORIES.md](SERVER-APT-REPOSITORIES.md).
+[SERVER-MAINTENANCE.md](SERVER-MAINTENANCE.md).
 
 ## Build host layout
 

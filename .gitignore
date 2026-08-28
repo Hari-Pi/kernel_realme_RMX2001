@@ -66,11 +66,24 @@ modules.builtin
 /OUT/
 /debian/changelog
 
+# Debian package outputs
+*.buildinfo
+*.changes
+*.deb
+/debian/.debhelper/
+/debian/*.debhelper.log
+/debian/*.substvars
+/debian/debhelper-build-stamp
+/debian/files
 
 #
 # tar directory (make tar*-pkg)
 #
 /tar-install/
+
+# Local boot and packaging artifacts
+/*.img
+/*-artifacts/
 
 #
 # git files that we don't want to ignore even if they are dot-files
