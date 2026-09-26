@@ -15,7 +15,7 @@ concurrency:
 jobs:
   build:
     name: Build boot image and Debian package
-    runs-on: [self-hosted, linux, x64, rmx2001-build]
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
       - name: Check out source
@@ -34,6 +34,7 @@ jobs:
         shell: bash
         env:
           BUILD_TMPDIR: ${{ runner.temp }}
+          BUILD_MIN_FREE_GIB: 8
           ARTIFACT_ROOT: ${{ runner.temp }}/rmx2001-build
           COLLECTION: ${{ runner.temp }}/rmx2001-upload
         run: |

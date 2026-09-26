@@ -15,6 +15,7 @@ mode=build
 allow_dirty=0
 jobs=${JOBS:-}
 output_root=${OUTPUT_DIR:-"$(dirname "$root")/rmx2001-kernel-artifacts"}
+min_free_gib=${BUILD_MIN_FREE_GIB:-25}
 key_file=${DROIDIAN_KEY_FILE:-"$root/helpers/keys/droidian.gpg"}
 build_tree=
 artifact_directory=
@@ -66,6 +67,7 @@ done
 
 [[ -n $jobs ]] || jobs=$(detect_jobs)
 [[ $jobs =~ ^[1-9][0-9]*$ ]] || die '--jobs must be a positive integer'
+[[ $min_free_gib =~ ^[1-9][0-9]*$ ]] || die 'BUILD_MIN_FREE_GIB must be a positive integer'
 [[ $(uname -s) == Linux ]] || die 'build host must be Linux (WSL 2 is supported)'
 [[ $(uname -m) == x86_64 ]] || die 'build host must be x86_64/amd64'
 
@@ -105,8 +107,8 @@ while [[ ! -e $space_path ]]; do
     space_path=$parent
 done
 available_kib=$(df -Pk "$space_path" | awk 'NR==2 {print $4}')
-if [[ $available_kib -lt 26214400 ]]; then
-    die 'at least 25 GiB free space is required at the artifact destination'
+if [[ $available_kib -lt $((min_free_gib * 1048576)) ]]; then
+    die "at least $min_free_gib GiB free space is required at the artifact destination"
 fi
 
 note "source commit: $(git -C "$root" rev-parse HEAD)"

@@ -44,18 +44,12 @@ and SHA-256 checksums as a downloadable workflow artifact. It can also be
 started manually from GitHub Actions. These are build outputs, not a release or
 a boot-tested image.
 
-Use a **minimal Debian 13 (amd64)** installation as the self-hosted runner. It
-needs Docker Engine, Git, `dpkg-deb`, access to the Docker daemon, and at least
-25 GiB free in its temporary directory. Register it for this repository with
-the `rmx2001-build` label; the workflow uses two build jobs. A disk larger than
-the 25 GiB minimum leaves room for Docker images and build outputs. GitHub's
-standard hosted Ubuntu runners have only 14 GB of storage, so they do not meet
-this build's preflight requirement. See [GitHub's runner setup](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/add-runners)
-and [Docker's Debian installation guide](https://docs.docker.com/engine/install/debian/).
-Once the runner is online, each push to `droidian` builds and uploads the files
-automatically. The workflow does not require the stock boot backup or
-MagiskBoot; those are inputs to the separate guarded package workflow described
-above.
+The workflow compiles on a GitHub-hosted `ubuntu-24.04` runner using the pinned
+Droidian Docker image. It uses two build jobs and checks for at least 8 GiB free
+space before starting; local builds retain the 25 GiB preflight default. Each
+push to `droidian` builds and uploads the files automatically. The workflow
+does not require the stock boot backup or MagiskBoot; those are inputs to the
+separate guarded package workflow described above.
 
 ## Droidian installation notes
 
