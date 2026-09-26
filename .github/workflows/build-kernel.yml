@@ -36,7 +36,7 @@ jobs:
           build_dir=${builds[0]}
           (cd "$build_dir" && sha256sum --check SHA256SUMS)
 
-          mapfile -t packages < <(find "$build_dir" -maxdepth 1 -type f -name 'linux-bootimage-*_arm64.deb' -print)
+          mapfile -t packages < <(find "$build_dir" -maxdepth 1 -type f -name 'linux-bootimage-4.14.141-realme-rmx2001_*_arm64.deb' -print)
           test "${#packages[@]}" -eq 1
           test -s "$build_dir/boot.img"
           test -s "${packages[0]}"
