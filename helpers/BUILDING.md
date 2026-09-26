@@ -4,7 +4,7 @@
 
 - Linux x86_64 host (WSL 2 is supported)
 - Docker daemon access
-- Git and at least 25 GiB of free space
+- Git and enough free space for the Docker image, build tree, and artifacts
 - validated 32 MiB RMX2001 stock boot image
 - pinned x86_64 MagiskBoot binary
 

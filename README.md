@@ -45,9 +45,8 @@ started manually from GitHub Actions. These are build outputs, not a release or
 a boot-tested image.
 
 The workflow compiles on a GitHub-hosted `ubuntu-24.04` runner using the pinned
-Droidian Docker image. It uses two build jobs and checks for at least 8 GiB free
-space before starting; local builds retain the 25 GiB preflight default. Each
-push to `droidian` builds and uploads the files automatically. The workflow
+Droidian Docker image. It uses two build jobs. Each push to `droidian` builds
+and uploads the files automatically. The workflow
 does not require the stock boot backup or MagiskBoot; those are inputs to the
 separate guarded package workflow described above.
 

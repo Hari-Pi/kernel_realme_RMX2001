@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: rmx2001-build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -21,20 +21,10 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
-      - name: Check runner prerequisites
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(uname -m)" = x86_64
-          docker info >/dev/null
-          command -v dpkg-deb
-          df -h "$RUNNER_TEMP"
-
       - name: Build and collect artifacts
         shell: bash
         env:
           BUILD_TMPDIR: ${{ runner.temp }}
-          BUILD_MIN_FREE_GIB: 8
           ARTIFACT_ROOT: ${{ runner.temp }}/rmx2001-build
           COLLECTION: ${{ runner.temp }}/rmx2001-upload
         run: |

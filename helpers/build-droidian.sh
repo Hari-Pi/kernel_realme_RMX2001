@@ -15,7 +15,6 @@ mode=build
 allow_dirty=0
 jobs=${JOBS:-}
 output_root=${OUTPUT_DIR:-"$(dirname "$root")/rmx2001-kernel-artifacts"}
-min_free_gib=${BUILD_MIN_FREE_GIB:-25}
 key_file=${DROIDIAN_KEY_FILE:-"$root/helpers/keys/droidian.gpg"}
 build_tree=
 artifact_directory=
@@ -67,11 +66,10 @@ done
 
 [[ -n $jobs ]] || jobs=$(detect_jobs)
 [[ $jobs =~ ^[1-9][0-9]*$ ]] || die '--jobs must be a positive integer'
-[[ $min_free_gib =~ ^[1-9][0-9]*$ ]] || die 'BUILD_MIN_FREE_GIB must be a positive integer'
 [[ $(uname -s) == Linux ]] || die 'build host must be Linux (WSL 2 is supported)'
 [[ $(uname -m) == x86_64 ]] || die 'build host must be x86_64/amd64'
 
-for command in awk df docker git grep sha256sum stat tar; do require "$command"; done
+for command in awk docker git grep sha256sum stat tar; do require "$command"; done
 docker info >/dev/null 2>&1 || die 'Docker daemon is unavailable; run with Docker access or appropriate privileges'
 git -C "$root" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die 'source is not a Git checkout'
 
@@ -99,17 +97,6 @@ grep -Eq '^FLASH_IS_AONLY[[:space:]]*=[[:space:]]*1([[:space:]]*)$' "$root/debia
 grep -Eq '^CLANG_VERSION[[:space:]]*=[[:space:]]*6\.0-4691093([[:space:]]*)$' "$root/debian/kernel-info.mk" || die 'CLANG_VERSION must select Droidian Clang 6'
 grep -Eq '^BUILD_PATH[[:space:]]*=[[:space:]]*/usr/lib/llvm-android-6\.0-4691093/bin([[:space:]]*)$' "$root/debian/kernel-info.mk" || die 'BUILD_PATH must use Droidian packaged Clang 6'
 grep -q '^out/KERNEL_OBJ/init_boot-default\.img:' "$root/debian/rules" || die 'header-v2 init_boot workaround is missing'
-
-space_path=$output_root
-while [[ ! -e $space_path ]]; do
-    parent=$(dirname "$space_path")
-    [[ $parent != "$space_path" ]] || die "cannot find an existing parent for output path: $output_root"
-    space_path=$parent
-done
-available_kib=$(df -Pk "$space_path" | awk 'NR==2 {print $4}')
-if [[ $available_kib -lt $((min_free_gib * 1048576)) ]]; then
-    die "at least $min_free_gib GiB free space is required at the artifact destination"
-fi
 
 note "source commit: $(git -C "$root" rev-parse HEAD)"
 note "container: $IMAGE"
