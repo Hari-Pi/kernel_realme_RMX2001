@@ -1,4 +1,4 @@
-name: Build RMX2001 kernel
+name: Build RMX2001 MagiskBoot package
 
 on:
   push:
@@ -14,12 +14,53 @@ concurrency:
 
 jobs:
   build:
-    name: Build boot image and Debian package
+    name: Build MagiskBoot boot image and Debian package
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     steps:
       - name: Check out source
         uses: actions/checkout@v4
+
+      - name: Download verified stock boot image
+        shell: bash
+        env:
+          BOOT_BACKUPS_SSH_KEY: ${{ secrets.BOOT_BACKUPS_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$BOOT_BACKUPS_SSH_KEY" || { echo 'BOOT_BACKUPS_SSH_KEY is missing' >&2; exit 1; }
+          mkdir -p "$RUNNER_TEMP/rmx2001-inputs"
+          printf '%s\n' "$BOOT_BACKUPS_SSH_KEY" > "$RUNNER_TEMP/rmx2001-inputs/deploy-key"
+          chmod 600 "$RUNNER_TEMP/rmx2001-inputs/deploy-key"
+          curl --fail --location --retry 3 https://api.github.com/meta \
+            | jq -r '.ssh_keys[] | "github.com " + .' > "$RUNNER_TEMP/rmx2001-inputs/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $RUNNER_TEMP/rmx2001-inputs/deploy-key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$RUNNER_TEMP/rmx2001-inputs/known_hosts"
+          git clone --depth 1 --filter=blob:none --sparse \
+            git@github.com:Hari-Pi/droidian-boot-backups.git \
+            "$RUNNER_TEMP/rmx2001-backups"
+          git -C "$RUNNER_TEMP/rmx2001-backups" sparse-checkout set backups/20260820-rmx2001
+          rm "$RUNNER_TEMP/rmx2001-inputs/deploy-key"
+          cp "$RUNNER_TEMP/rmx2001-backups/backups/20260820-rmx2001/realme-rmx2001-boot-20260820.img.xz" \
+            "$RUNNER_TEMP/rmx2001-inputs/"
+          echo 'f0d3702865a7ea652aae2ad81d99d4922ff4a4ce22a8cca41f878fdd97a80258  realme-rmx2001-boot-20260820.img.xz' \
+            | (cd "$RUNNER_TEMP/rmx2001-inputs" && sha256sum --check)
+          xz -dc "$RUNNER_TEMP/rmx2001-inputs/realme-rmx2001-boot-20260820.img.xz" \
+            > "$RUNNER_TEMP/rmx2001-inputs/realme-rmx2001-boot-20260820.img"
+          echo 'ce5d48e4802398ceb2cd0dd8c84e04dd944cac08bb540ace87f1c26a9ffe14c2  realme-rmx2001-boot-20260820.img' \
+            | (cd "$RUNNER_TEMP/rmx2001-inputs" && sha256sum --check)
+
+      - name: Download pinned MagiskBoot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/rmx2001-inputs"
+          curl --fail --location --retry 3 \
+            --output "$RUNNER_TEMP/rmx2001-inputs/Magisk-v30.7.apk" \
+            https://github.com/topjohnwu/Magisk/releases/download/v30.7/Magisk-v30.7.apk
+          unzip -p "$RUNNER_TEMP/rmx2001-inputs/Magisk-v30.7.apk" lib/x86_64/libmagiskboot.so \
+            > "$RUNNER_TEMP/rmx2001-inputs/magiskboot"
+          chmod +x "$RUNNER_TEMP/rmx2001-inputs/magiskboot"
+          echo 'a18ecbd7981179494b7d281453d6c4e25b5c719e7d2ef7f6eba3c6be3043c58e  magiskboot' \
+            | (cd "$RUNNER_TEMP/rmx2001-inputs" && sha256sum --check)
 
       - name: Build and collect artifacts
         shell: bash
@@ -29,22 +70,29 @@ jobs:
           COLLECTION: ${{ runner.temp }}/rmx2001-upload
         run: |
           set -euo pipefail
-          ./build.sh --jobs 2 --output "$ARTIFACT_ROOT"
+          ./helpers/build-magiskboot-deb.sh \
+            --jobs 2 \
+            --stock-boot "$RUNNER_TEMP/rmx2001-inputs/realme-rmx2001-boot-20260820.img" \
+            --magiskboot "$RUNNER_TEMP/rmx2001-inputs/magiskboot" \
+            --output "$ARTIFACT_ROOT"
 
           mapfile -t builds < <(find "$ARTIFACT_ROOT" -mindepth 1 -maxdepth 1 -type d -print)
           test "${#builds[@]}" -eq 1
           build_dir=${builds[0]}
           (cd "$build_dir" && sha256sum --check SHA256SUMS)
 
-          mapfile -t packages < <(find "$build_dir" -maxdepth 1 -type f -name 'linux-bootimage-4.14.141-realme-rmx2001_*_arm64.deb' -print)
+          mapfile -t packages < <(find "$build_dir" -maxdepth 1 -type f -name 'linux-bootimage-4.14.141-realme-rmx2001_0.0.0+magiskboot.*_arm64.deb' -print)
           test "${#packages[@]}" -eq 1
           test -s "$build_dir/boot.img"
           test -s "${packages[0]}"
           test -s "$build_dir/MANIFEST.txt"
 
           mkdir -p "$COLLECTION"
-          cp "$build_dir/boot.img" "${packages[0]}" "$build_dir/MANIFEST.txt" "$COLLECTION/"
-          (cd "$COLLECTION" && sha256sum boot.img ./*.deb MANIFEST.txt > SHA256SUMS)
+          cp "$build_dir/boot.img" "${packages[0]}" "$build_dir/MANIFEST.txt" \
+            "$build_dir/PRESERVED-COMPONENTS.txt" "$build_dir/package-info.txt" \
+            "$build_dir/package-contents.txt" "$COLLECTION/"
+          (cd "$COLLECTION" && sha256sum boot.img ./*.deb MANIFEST.txt \
+            PRESERVED-COMPONENTS.txt package-info.txt package-contents.txt > SHA256SUMS)
           cat "$COLLECTION/MANIFEST.txt" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload boot image and Debian package

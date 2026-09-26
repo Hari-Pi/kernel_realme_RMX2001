@@ -38,17 +38,20 @@ as deployable until it has passed real-device boot testing.
 ## Automated builds
 
 Pushing to `droidian` starts the
-[kernel build workflow](.github/workflows/build-kernel.yml). It runs the native
-Droidian compiler and uploads `boot.img`, the `arm64` Debian package, a manifest,
-and SHA-256 checksums as a downloadable workflow artifact. It can also be
-started manually from GitHub Actions. These are build outputs, not a release or
-a boot-tested image.
+[kernel build workflow](.github/workflows/build-kernel.yml). It compiles the
+kernel with the pinned Droidian builder, then uses MagiskBoot to replace only
+the kernel in the verified stock boot layout. It uploads the resulting
+`boot.img`, the guarded `arm64` MagiskBoot Debian package, a manifest, component
+audit, and SHA-256 checksums as a downloadable workflow artifact. It can also
+be started manually from GitHub Actions. These are build outputs, not a release
+or a boot-tested image.
 
 The workflow compiles on a GitHub-hosted `ubuntu-24.04` runner using the pinned
-Droidian Docker image. It uses two build jobs. Each push to `droidian` builds
-and uploads the files automatically. The workflow
-does not require the stock boot backup or MagiskBoot; those are inputs to the
-separate guarded package workflow described above.
+Droidian Docker image. It uses two build jobs. A read-only deploy key stored as
+the `BOOT_BACKUPS_SSH_KEY` Actions secret lets it fetch the private, verified
+stock image. It downloads the pinned MagiskBoot binary from the official v30.7
+release and verifies both inputs by SHA-256. Each push to `droidian` builds and
+uploads the files automatically.
 
 ## Droidian installation notes
 
