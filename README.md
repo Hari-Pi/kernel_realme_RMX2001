@@ -35,6 +35,28 @@ MagiskBoot packager. Check its prerequisites independently with:
 The backend's generated boot image is structurally verified but is not treated
 as deployable until it has passed real-device boot testing.
 
+## Automated builds
+
+Pushing to `droidian` starts the
+[kernel build workflow](.github/workflows/build-kernel.yml). It runs the native
+Droidian compiler and uploads `boot.img`, the `arm64` Debian package, a manifest,
+and SHA-256 checksums as a downloadable workflow artifact. It can also be
+started manually from GitHub Actions. These are build outputs, not a release or
+a boot-tested image.
+
+Use a **minimal Debian 13 (amd64)** installation as the self-hosted runner. It
+needs Docker Engine, Git, `dpkg-deb`, access to the Docker daemon, and at least
+25 GiB free in its temporary directory. Register it for this repository with
+the `rmx2001-build` label; the workflow uses two build jobs. A disk larger than
+the 25 GiB minimum leaves room for Docker images and build outputs. GitHub's
+standard hosted Ubuntu runners have only 14 GB of storage, so they do not meet
+this build's preflight requirement. See [GitHub's runner setup](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/add-runners)
+and [Docker's Debian installation guide](https://docs.docker.com/engine/install/debian/).
+Once the runner is online, each push to `droidian` builds and uploads the files
+automatically. The workflow does not require the stock boot backup or
+MagiskBoot; those are inputs to the separate guarded package workflow described
+above.
+
 ## Droidian installation notes
 
 For the full kernel compilation procedure, see the

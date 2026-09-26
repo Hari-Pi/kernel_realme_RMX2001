@@ -1,0 +1,65 @@
+name: Build RMX2001 kernel
+
+on:
+  push:
+    branches: [droidian]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rmx2001-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build boot image and Debian package
+    runs-on: [self-hosted, linux, x64, rmx2001-build]
+    timeout-minutes: 360
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Check runner prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          docker info >/dev/null
+          command -v dpkg-deb
+          df -h "$RUNNER_TEMP"
+
+      - name: Build and collect artifacts
+        shell: bash
+        env:
+          BUILD_TMPDIR: ${{ runner.temp }}
+          ARTIFACT_ROOT: ${{ runner.temp }}/rmx2001-build
+          COLLECTION: ${{ runner.temp }}/rmx2001-upload
+        run: |
+          set -euo pipefail
+          ./build.sh --jobs 2 --output "$ARTIFACT_ROOT"
+
+          mapfile -t builds < <(find "$ARTIFACT_ROOT" -mindepth 1 -maxdepth 1 -type d -print)
+          test "${#builds[@]}" -eq 1
+          build_dir=${builds[0]}
+          (cd "$build_dir" && sha256sum --check SHA256SUMS)
+
+          mapfile -t packages < <(find "$build_dir" -maxdepth 1 -type f -name 'linux-bootimage-*_arm64.deb' -print)
+          test "${#packages[@]}" -eq 1
+          test -s "$build_dir/boot.img"
+          test -s "${packages[0]}"
+          test -s "$build_dir/MANIFEST.txt"
+
+          mkdir -p "$COLLECTION"
+          cp "$build_dir/boot.img" "${packages[0]}" "$build_dir/MANIFEST.txt" "$COLLECTION/"
+          (cd "$COLLECTION" && sha256sum boot.img ./*.deb MANIFEST.txt > SHA256SUMS)
+          cat "$COLLECTION/MANIFEST.txt" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload boot image and Debian package
+        uses: actions/upload-artifact@v4
+        with:
+          name: rmx2001-kernel-${{ github.sha }}
+          path: ${{ runner.temp }}/rmx2001-upload/
+          if-no-files-found: error
+          retention-days: 14
