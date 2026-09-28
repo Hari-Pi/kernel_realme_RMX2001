@@ -467,12 +467,6 @@ prepare_graphical_boot() {
     systemctl enable phosh.service >/dev/null
 }
 
-enable_power_button_helper() {
-    if unit_exists pbhelper.service; then
-        systemctl enable --now pbhelper.service >/dev/null 2>&1 || warn "could not start pbhelper.service"
-    fi
-}
-
 install_units() {
     user=$1
     install -d -m 755 /etc/systemd/system/phosh.service.d
@@ -539,17 +533,15 @@ mode_on() {
     [ -n "$user" ] || exit 1
     write_mode on
     log "Enabling server mode..."
-    log "[1/3] Setting the default boot target and disabling the power-button helper"
+    log "[1/2] Setting the default boot target"
     systemctl set-default multi-user.target >/dev/null
-    systemctl disable --now pbhelper.service >/dev/null 2>&1 || true
-    log "[2/3] Running independent shutdown steps in parallel"
+    log "[2/2] Running independent shutdown steps in parallel"
     run_parallel \
         "  Powering off the display" "display_off '$user'" \
         "  Disabling graphical startup" "disable_graphical_startup" \
         "  Stopping unused Android phone HALs" "android_hal_set stop" \
         "  Disabling desktop audio" "mask_user_audio '$user'" \
         "  Disabling phone-only background services" "mask_phone_units"
-    log "[3/3] Done"
     log "Server mode is on. SSH, networking, Cloudflare, and Docker were not changed."
 }
 
@@ -564,9 +556,7 @@ mode_off() {
         "  Restoring desktop audio" "restore_user_audio '$user'" \
         "  Preparing the graphical boot target" "prepare_graphical_boot" \
         "  Starting Android phone HALs" "android_hal_set start" \
-        "  Restoring the display and touch interface" "display_on '$user'" \
-        "  Enabling the power-button helper" "enable_power_button_helper"
-    log "[2/2] Done"
+        "  Restoring the display and touch interface" "display_on '$user'"
     log "Server mode is off. Display, touch, audio, and phone services are available."
 }
 
@@ -580,7 +570,6 @@ mode_status() {
     printf 'desktop user: %s\n' "${user:-unknown}"
     printf 'phosh: %s\n' "$(systemctl is-active phosh.service 2>/dev/null || true)"
     printf 'hardware composer: %s\n' "$(systemctl is-active android-service@hwcomposer.service 2>/dev/null || true)"
-    printf 'power button helper: %s\n' "$(systemctl is-active pbhelper.service 2>/dev/null || true)"
     printf 'display brightness: %s\n' "$brightness"
     if grep -q 'Name="touchpanel"' /proc/bus/input/devices 2>/dev/null; then
         printf 'touch input: present\n'

@@ -116,11 +116,11 @@ wget https://raw.githubusercontent.com/NeelamArunkumar/droidian-script/main/70-d
 
 Restart the phone after installing the udev rule.
 
-### Server mode and the power button helper
+### Server mode
 
 The [Quick start](#quick-start-already-flashed-device) one-liner at the top
-of this README installs both of these — nothing further to do manually on a
-device that's already been through it.
+of this README installs this — nothing further to do manually on a device
+that's already been through it.
 
 `server mode` (installed as `/usr/local/bin/server`, from
 [`helpers/server-mode.sh`](helpers/server-mode.sh)) toggles the device
@@ -133,12 +133,16 @@ sudo server mode off   # phone GUI: Phosh, display, touch, audio, phone HALs bac
 ```
 
 `server mode on` leaves SSH, networking, Cloudflare tunnels, and Docker
-untouched. The selected mode persists across reboots. `server mode off` also
-re-enables `pbhelper.service` (the power-button screen-wake helper) as part
-of restoring the phone GUI — it is not installed or managed separately.
-See [`helpers/DEVICE-PROVISIONING.md`](helpers/DEVICE-PROVISIONING.md) for
-the full design rationale (why it checks state before acting, runs
-independent steps in parallel, and how Ctrl+C cancellation works).
+untouched. The selected mode persists across reboots. See
+[`helpers/DEVICE-PROVISIONING.md`](helpers/DEVICE-PROVISIONING.md) for the
+full design rationale (why it checks state before acting, runs independent
+steps in parallel, and how Ctrl+C cancellation works).
+
+An earlier `pbhelper.service` (power-button screen-wake helper) that
+`server mode off` used to re-enable turned out to be an orphaned manual
+install with no open file descriptor to any input device — confirmed doing
+nothing after a Droidian update changed how power-button wake is handled.
+Removed from `server-mode.sh` and stopped on-device.
 
 ## Safety
 
