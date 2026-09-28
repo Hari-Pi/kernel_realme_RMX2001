@@ -80,3 +80,27 @@ Also test display, touch, power controls, charging, suspend and resume, Wi-Fi,
 SSH, and any device-specific hardware used by the target installation. Keep a
 build only after it survives repeated cold boots and an appropriate stability
 test. Publish only artifacts that passed this validation.
+
+## 7. Publish a validated build
+
+Once a build has passed step 6, publish it as a GitHub Release so it is
+distinguishable from unvalidated workflow artifacts:
+
+```sh
+gh release create <tag> \
+  boot.img <package>.deb MANIFEST.txt PRESERVED-COMPONENTS.txt \
+  package-info.txt package-contents.txt SHA256SUMS \
+  --title "<title>" --notes-file <notes.md> --latest
+```
+
+Release notes should record the source commit, package and candidate boot
+checksums, and a summary of the step 6 validation (what was checked, and
+which failures, if any, were confirmed pre-existing rather than caused by the
+new kernel). This publish step is currently manual.
+
+A device-triggered pipeline — where the device reports a successful reboot
+back to GitHub Actions (for example via `repository_dispatch` or a
+`workflow_dispatch` call from a device-side script) and a separate workflow
+job then runs the `gh release create` above automatically — is planned but not
+yet built. Until it exists, treat every release as the result of a human
+having completed step 6 on real hardware.

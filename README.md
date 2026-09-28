@@ -46,6 +46,14 @@ audit, and SHA-256 checksums as a downloadable workflow artifact. It can also
 be started manually from GitHub Actions. These are build outputs, not a release
 or a boot-tested image.
 
+A build only becomes a [GitHub Release](https://github.com/Hari-Pi/kernel_realme_RMX2001/releases)
+after it passes the manual install-and-reboot validation in
+[`helpers/KERNEL-BUILD-AND-TEST.md`](helpers/KERNEL-BUILD-AND-TEST.md). Publishing
+is currently a manual step (`gh release create`) run once that validation
+passes; see that doc's "Publish a validated build" section. Gating the publish
+step on an automatic report of reboot success from the device, instead of a
+manual step, is tracked as follow-up work and not yet implemented.
+
 The workflow compiles on a GitHub-hosted `ubuntu-24.04` runner using the pinned
 Droidian Docker image. It uses two build jobs. A read-only deploy key stored as
 the `BOOT_BACKUPS_SSH_KEY` Actions secret lets it fetch the private, verified
