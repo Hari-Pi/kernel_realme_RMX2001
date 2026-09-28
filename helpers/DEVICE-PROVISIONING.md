@@ -404,6 +404,50 @@ unlike Firefox) is the browser expected to benefit from this fix. Chromium is
 not actually installed (only `chromium-sandbox`, a dependency of something
 else) so it was not evaluated as an alternative.
 
+## Upstream Droidian repo audit (2026-09-28)
+
+Checked the actual upstream source repos (not just this device's apt cache)
+for the packages touched above, via `gh api repos/droidian/<pkg>/commits`:
+
+- **`bluebinder`** and **`gst-droid`** (source of `gstreamer1.0-droid`):
+  this device already runs the latest commit of both
+  (`cec1d04`/2024-03-01 and `946765b`/2024-05-18 respectively — confirmed
+  these are the top of each repo's commit log). The `==` bashism in
+  `bluebinder_post.sh` and the broken `droidvdec`/`droidadec` decode path are
+  both still present upstream, unpatched — genuine upstream bugs, not
+  staleness in this device's package snapshot. Worth reporting/PRing to
+  [droidian/bluebinder](https://github.com/droidian/bluebinder) given how
+  trivial the `==` → `=` fix is.
+- **A real, usable device-specific example exists** for the "no Bluetooth
+  address in any Android property" problem: the official
+  [porting guide's debugging tips](https://github.com/droidian-releng/docs.droidian.org/blob/main/content/porting-guide/debugging-tips.md)
+  documents a `droid-get-bt-address.sh` mechanism precisely for this case,
+  linking a MediaTek example at
+  [droidian-devices/adaptation-droidian-angelica](https://github.com/droidian-devices/adaptation-droidian-angelica/blob/droidian/usr/bin/droid/droid-get-bt-address.sh).
+  That specific script derives the address from an existing
+  `/var/lib/bluetooth/<addr>/` directory rather than reading NVRAM directly,
+  so it's a "keep whatever address BlueZ already picked" persistence trick,
+  not a general NVRAM reader — not copied here since it wouldn't do anything
+  useful before BlueZ has run at least once, and this device's controller
+  already gets a stable, working default address without it. Worth
+  revisiting only if the address is ever observed changing across reboots.
+- **Tried and reverted:** upstream `droidian-quirks-firefox-gpu`
+  (available in this device's own apt repo, not installed by default) was
+  installed to test re-enabling Firefox's WebRender/GPU acceleration — its
+  commit message claims this became safe on Droidian 101, which this device
+  runs, contradicting the currently-installed `droidian-quirks-firefox`
+  package's own comment that it breaks Firefox on Mali GPUs. Tested directly:
+  Firefox segfaulted immediately (`status=11`, minidump generated,
+  `[GFX1-]: No GPUs detected via PCI` /
+  `vaapitest: VA-API test failed: failed to open renderDeviceFD` in the
+  crash log) on this Mali-G76 device. **Removed** — do not reinstall
+  `droidian-quirks-firefox-gpu` on this device; the "fixed since 101" claim
+  does not hold for this GPU/driver combination. Firefox remains without GPU
+  acceleration here (see the GStreamer section above for why Epiphany, not
+  Firefox, is the browser expected to benefit from hardware video decode).
+- No other apt package updates were pending for droidian-sourced packages at
+  audit time (only an unrelated `tailscale` update was available).
+
 ## Kernel-log noise still open (not yet addressed)
 
 Found during the same audit, not yet fixed:
