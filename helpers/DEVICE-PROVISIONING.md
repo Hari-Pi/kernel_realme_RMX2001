@@ -341,6 +341,69 @@ These were confirmed byte-identical across boots and kernel versions before
 being ruled out as regressions; do not spend time chasing them as kernel
 bugs without new evidence.
 
+## GStreamer video decode: droidvdec/droidadec are broken, ranked down
+
+**Symptom:** YouTube (and any other GStreamer-based video, e.g. in
+Epiphany/WebKitGTK) did not play at all.
+
+**Root cause:** `decodebin`/`playbin` autoplugging picks the highest-ranked
+decoder for a given format, and the `gstreamer1.0-droid` package's
+`droidvdec`/`droidadec` elements (a bridge to Android's StageFright video/audio
+decode HAL, same family of broken HAL bridges as the camera, fingerprint, and
+NFC issues elsewhere in this document) outrank the real hardware decoder.
+Confirmed directly with a real downloaded H.264 MP4:
+
+```sh
+gst-launch-1.0 -q playbin uri=file:///path/to/real.mp4 video-sink=fakesink audio-sink=fakesink
+# ERROR: .../GstDroidVDec:droidvdec0: No valid frames decoded before end of stream
+```
+
+GStreamer does not fall back to another decoder once autoplugging has
+committed to one, so the whole pipeline fails — the video never plays, rather
+than playing slowly. The actual hardware decoder works correctly once
+selected:
+
+```sh
+GST_PLUGIN_FEATURE_RANK=droidvdec:0,droidadec:0 gst-launch-1.0 -q playbin uri=file:///path/to/real.mp4 video-sink=fakesink audio-sink=fakesink
+# selects v4l2h264dec (hardware) + avdec_aac, plays with no errors
+```
+
+Confirmed present for both H.264 (`v4l2h264dec`) and VP9 (`v4l2vp9dec` —
+YouTube's default codec); both hardware decoder elements exist and are
+usable (`/dev/video0`/`/dev/video1` are world-read/write, no permission
+issue).
+
+**Fix applied:** ranked `droidvdec`/`droidadec` down to 0 for the whole
+graphical session via systemd's `environment.d` mechanism (already used on
+this device for one other purpose — see `/etc/environment.d/90qt-a11y.conf`
+for precedent):
+
+```
+/etc/environment.d/80-gstreamer-video-decode.conf:
+GST_PLUGIN_FEATURE_RANK=droidvdec:0,droidadec:0
+```
+
+This is read once when the systemd `--user` manager starts (i.e. at
+login/session start, not hot-reloadable) — confirmed present with
+`systemctl --user show-environment` and confirmed effective by launching a
+test pipeline the same way real apps are launched, through
+`systemd-run --user` (a plain `runuser -u <user>` shell does **not** inherit
+this — it bypasses the systemd user manager entirely, which is a test-harness
+gotcha, not a real gap). If this file is ever lost on a reflash, video
+playback will silently regress to the broken droid path with no crash or
+obvious error pointing back here — check this section first if it recurs.
+
+**Not yet done:** the underlying `gstreamer1.0-droid` HAL bridge itself is
+still broken and unused for video, and Firefox has `layers.acceleration
+.disabled=true` set device-wide by `droidian-quirks-firefox`'s
+`hybris-gpu.js` (a known Mali GPU workaround — the package comment says
+enabling it breaks Firefox on Mali GPUs). Firefox therefore almost certainly
+has no GPU-accelerated video path at all on this device regardless of the
+GStreamer fix above; Epiphany/WebKitGTK (which uses GStreamer for media,
+unlike Firefox) is the browser expected to benefit from this fix. Chromium is
+not actually installed (only `chromium-sandbox`, a dependency of something
+else) so it was not evaluated as an alternative.
+
 ## Kernel-log noise still open (not yet addressed)
 
 Found during the same audit, not yet fixed:
