@@ -1,0 +1,3 @@
+/usr/lib/droid-vendor-overlay/etc/vintf/manifest.xml
+/etc/environment.d/80-gstreamer-video-decode.conf
+/etc/systemd/system/bluebinder.service.d/99-ignore-missing-bdaddr.conf

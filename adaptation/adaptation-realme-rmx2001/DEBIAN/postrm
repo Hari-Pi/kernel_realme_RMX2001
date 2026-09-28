@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    remove|purge)
+        dpkg-divert --package adaptation-realme-rmx2001 --rename \
+            --divert /usr/bin/droid/bluebinder_post.sh.orig-bashism-bug \
+            --remove /usr/bin/droid/bluebinder_post.sh >/dev/null 2>&1 || true
+
+        dpkg-divert --package adaptation-realme-rmx2001 --rename \
+            --divert /usr/share/dbus-1/system-services/org.freedesktop.ModemManager1.service.disabled-no-sim \
+            --remove /usr/share/dbus-1/system-services/org.freedesktop.ModemManager1.service >/dev/null 2>&1 || true
+
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        systemctl reload dbus.service >/dev/null 2>&1 || true
+        ;;
+esac
+
+exit 0

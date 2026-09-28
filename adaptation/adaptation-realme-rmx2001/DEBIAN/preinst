@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    install|upgrade)
+        # Divert these two files *before* dpkg unpacks this package's own
+        # copies over them - both paths are currently owned by other
+        # packages (bluebinder, modemmanager). Diverting first means dpkg
+        # writes our files into place cleanly instead of conflicting with
+        # those packages' file ownership, and protects both paths from
+        # being silently restored by a future upgrade of either package.
+        dpkg-divert --package adaptation-realme-rmx2001 --rename \
+            --divert /usr/bin/droid/bluebinder_post.sh.orig-bashism-bug \
+            --add /usr/bin/droid/bluebinder_post.sh >/dev/null
+
+        # No -e guard: dpkg-divert --add registers the redirect (protecting
+        # against a future modemmanager upgrade recreating this file) even
+        # when there's currently nothing at the source path to move.
+        dpkg-divert --package adaptation-realme-rmx2001 --rename \
+            --divert /usr/share/dbus-1/system-services/org.freedesktop.ModemManager1.service.disabled-no-sim \
+            --add /usr/share/dbus-1/system-services/org.freedesktop.ModemManager1.service >/dev/null
+        ;;
+esac
+
+exit 0

@@ -1,0 +1,4 @@
+# Same reasoning as the system preset: no SIM will ever be installed, so
+# MMS and cellular call handling can never do anything useful.
+disable mmsd-tng.service
+disable calls-daemon.service

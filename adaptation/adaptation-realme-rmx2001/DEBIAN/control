@@ -1,0 +1,21 @@
+Package: adaptation-realme-rmx2001
+Version: 1.0.0
+Section: misc
+Priority: optional
+Architecture: all
+Maintainer: RMX2001 Droidian Maintainers <noreply@localhost>
+Depends: bluebinder, systemd
+Replaces: bluebinder
+Recommends: modemmanager
+Description: Device adaptation for the Realme 6 (RMX2001) Droidian port
+ Applies every device-specific fix accumulated during this port's
+ bring-up: removes the unregistered camera provider HAL from the VINTF
+ manifest, fixes a POSIX-sh bashism in bluebinder's address-lookup
+ script and makes its missing-address failure non-fatal, ranks the
+ broken droidvdec/droidadec GStreamer decoders below the working
+ hardware/software ones, permanently disables cellular (ofono,
+ ModemManager, mmsd-tng, calls-daemon - this device never has a SIM),
+ and installs the server-mode headless/phone toggle.
+ .
+ See helpers/DEVICE-PROVISIONING.md in the kernel source repository for
+ the full rationale and investigation behind each fix.

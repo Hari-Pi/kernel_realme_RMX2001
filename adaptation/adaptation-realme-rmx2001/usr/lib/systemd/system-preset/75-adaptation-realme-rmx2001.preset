@@ -1,0 +1,7 @@
+# This device will never have a SIM installed; cellular services can never
+# do anything useful. See helpers/DEVICE-PROVISIONING.md in the kernel repo
+# for the full reasoning. Masked (not just disabled) in postinst for the
+# stronger guarantee; this preset covers the case where the unit is
+# reinstalled/re-enabled by a future package update.
+disable ofono.service
+disable ModemManager.service

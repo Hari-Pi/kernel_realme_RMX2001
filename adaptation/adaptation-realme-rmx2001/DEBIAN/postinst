@@ -1,0 +1,47 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    configure)
+        # Re-mount /vendor so hwservicemanager and friends see the VINTF
+        # manifest override immediately, if /vendor happens to be mounted
+        # right now. Harmless no-op if it isn't.
+        mount -o remount /vendor 2>/dev/null || true
+
+        # (bluebinder_post.sh and ModemManager's D-Bus activation file were
+        # already diverted in preinst, before dpkg unpacked this package's
+        # files over them.)
+
+        systemctl daemon-reload >/dev/null 2>&1 || true
+        systemctl reload dbus.service >/dev/null 2>&1 || true
+
+        # This device will never have a SIM installed.
+        systemctl mask --now ofono.service ModemManager.service >/dev/null 2>&1 || true
+
+        # bluebinder only works with a kernel that has CONFIG_RFKILL, and
+        # server-mode.sh is the sole legitimate owner of its mask state once
+        # installed - do not fight it if server mode is on right now.
+        server_mode=off
+        [ -r /var/lib/server-mode/mode ] && server_mode=$(cat /var/lib/server-mode/mode)
+        if [ -e /dev/rfkill ] && [ "$server_mode" != on ]; then
+            systemctl unmask bluebinder.service >/dev/null 2>&1 || true
+        fi
+
+        # Install the server-mode toggle for the primary desktop user, and
+        # mask the per-user cellular-adjacent units server-mode.sh doesn't
+        # manage (they are --user units, unrelated to its PHONE_UNITS list).
+        desktop_user=$(getent passwd | awk -F: '$3 >= 1000 && $3 < 65534 && $7 !~ /(nologin|false)$/ { print $1; exit }')
+        if [ -n "$desktop_user" ]; then
+            /usr/local/sbin/server-mode install --user "$desktop_user" >/dev/null 2>&1 || true
+            uid=$(id -u "$desktop_user" 2>/dev/null) || uid=
+            if [ -n "$uid" ]; then
+                runuser -u "$desktop_user" -- env XDG_RUNTIME_DIR="/run/user/$uid" \
+                    DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$uid/bus" \
+                    systemctl --user mask --now mmsd-tng.service calls-daemon.service \
+                    >/dev/null 2>&1 || true
+            fi
+        fi
+        ;;
+esac
+
+exit 0

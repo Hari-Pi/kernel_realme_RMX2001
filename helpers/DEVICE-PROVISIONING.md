@@ -5,9 +5,24 @@ that are **not** part of this kernel tree and are **not** carried by any
 kernel package or release. If the device is ever reflashed or reprovisioned
 from scratch, these must be reapplied.
 
-**Run [`helpers/setup-rmx2001.sh`](setup-rmx2001.sh) first.** It applies
-every fix documented below as one idempotent script (checks current state,
-only changes what's needed, safe to re-run any time):
+**Install [`adaptation/adaptation-realme-rmx2001`](../adaptation/adaptation-realme-rmx2001)
+first.** It applies every fix documented below as one real Debian package
+(dpkg diversions + systemd presets, not just idempotent shell), following the
+[Droidian porting guide](https://github.com/droidian-releng/docs.droidian.org/blob/main/content/porting-guide/rootfs-creation.md)'s
+adaptation-package convention. Built and installed on-device (needs
+`dpkg-deb`, so run it on the device itself, not this Mac/CI host):
+
+```sh
+./helpers/build-adaptation-deb.sh
+sudo apt install ./adaptation-realme-rmx2001_*.deb
+sudo reboot
+```
+
+[`helpers/setup-rmx2001.sh`](setup-rmx2001.sh) applies the same fixes as a
+plain idempotent shell script (checks current state, only changes what's
+needed, safe to re-run any time) — no `dpkg`/`apt` bookkeeping, so it's not
+tracked as an installed package or cleanly removable, but it's a lighter
+option if you don't want to build a `.deb`:
 
 ```sh
 sudo ./helpers/setup-rmx2001.sh [--user NAME]
@@ -15,11 +30,11 @@ sudo reboot
 ```
 
 The prose below exists to explain *why* each fix exists and to let you apply
-one piece by hand if you ever need to; the script is what you actually run
-after a reflash. If you add a new device-specific fix by hand, add it to both
-the script and this document in the same change — this doc is the source of
-truth the script is generated from, and they drift apart if only one gets
-updated.
+one piece by hand if you ever need to. If you add a new device-specific fix
+by hand, add it to the adaptation package (or `setup-rmx2001.sh`, whichever
+you're maintaining) and this document in the same change — this doc is the
+source of truth both are meant to implement, and they drift apart if only one
+gets updated.
 
 Everything below targets the Droidian server reachable as `dazai@droidian`.
 

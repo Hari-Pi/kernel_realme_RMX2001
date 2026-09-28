@@ -56,14 +56,25 @@ manual step, is tracked as follow-up work and not yet implemented.
 
 ## Droidian installation notes
 
-Beyond the kernel itself, the live Droidian server has userspace-level fixes
-applied directly on-device that are not part of this repo or any kernel
-package (for example, a VINTF manifest override). These are **not**
-preserved by a reflash. After flashing, run
-[`helpers/setup-rmx2001.sh`](helpers/setup-rmx2001.sh) to reapply all of them
-in one idempotent pass; see
-[`helpers/DEVICE-PROVISIONING.md`](helpers/DEVICE-PROVISIONING.md) for what
-each fix is and why it's needed.
+Beyond the kernel itself, the live Droidian server needs a handful of
+device-specific fixes that are not part of this repo or any kernel package
+(for example, a VINTF manifest override). These are **not** preserved by a
+reflash. After flashing, install
+[`adaptation/adaptation-realme-rmx2001`](adaptation/adaptation-realme-rmx2001)
+— a real Debian package, following the
+[Droidian porting guide](https://github.com/droidian-releng/docs.droidian.org/blob/main/content/porting-guide/rootfs-creation.md)'s
+adaptation-package convention, that applies all of them via proper `dpkg`
+diversions and systemd presets instead of a shell script:
+
+```sh
+./helpers/build-adaptation-deb.sh   # run on a Debian host, e.g. the device itself
+sudo apt install ./adaptation-realme-rmx2001_*.deb
+```
+
+See [`helpers/DEVICE-PROVISIONING.md`](helpers/DEVICE-PROVISIONING.md) for
+what each fix is and why it's needed. `helpers/setup-rmx2001.sh` (a plain
+idempotent shell script doing the same thing without `dpkg` bookkeeping) is
+kept as a lighter-weight alternative.
 
 For the full kernel compilation procedure, see the
 [Droidian porting guide](https://github.com/droidian/porting-guide/blob/master/kernel-compilation.md).
