@@ -5,55 +5,46 @@ RMX2001 Droidian port.
 
 ## Build a boot package
 
-The guarded build compiles the kernel, replaces only the kernel inside a
-validated 32 MiB stock boot image, verifies the preserved boot components,
-and creates a Debian package:
+The primary build path is the official Droidian pipeline: it compiles the
+kernel in the pinned Droidian container via `releng-build-package` and
+produces a complete, directly bootable `boot.img` and Debian package on its
+own — no repacking step needed.
 
 ```sh
-./helpers/build-magiskboot-deb.sh \
-  --stock-boot /path/to/stock-boot.img \
-  --magiskboot /path/to/magiskboot
+./build.sh --jobs "$(nproc)"
 ```
 
 The build uses all available CPUs by default. Pass `--jobs N` to set a limit.
-The helper only creates artifacts; it does not connect to a device, install a
+`./build.sh --check-only` validates prerequisites without compiling. The
+helper only creates artifacts; it does not connect to a device, install a
 package, flash a partition, or reboot anything.
+
+This device's `boot.img` didn't always boot straight out of this pipeline —
+see [`helpers/AVB-FOOTER-FIX.md`](helpers/AVB-FOOTER-FIX.md) for the root
+cause (a missing AVB footer, from unset `debian/kernel-info.mk` keys) and how
+it was fixed and validated (three clean reboot cycles on real hardware, no
+new failed units).
+
+A MagiskBoot-based repack of the validated stock boot image
+(`./helpers/build-magiskboot-deb.sh`) is kept as a manual fallback in case a
+future official-pipeline build ever regresses; it is not used by CI. See the
+last section of
+[helpers/KERNEL-BUILD-AND-TEST.md](helpers/KERNEL-BUILD-AND-TEST.md).
 
 See [helpers/BUILDING.md](helpers/BUILDING.md) for prerequisites and output
 layout. The package audit and device-validation procedure is documented in
 [helpers/KERNEL-BUILD-AND-TEST.md](helpers/KERNEL-BUILD-AND-TEST.md).
 
-## Compiler backend
-
-`./build.sh` creates the native Droidian compiler artifact consumed by the
-MagiskBoot packager. Check its prerequisites independently with:
-
-```sh
-./build.sh --check-only
-```
-
-The backend's generated boot image is structurally verified but is not treated
-as deployable until it has passed real-device boot testing.
-
 ## Automated builds
 
 Pushing to `droidian` starts the
-[kernel build workflow](.github/workflows/build-kernel.yml). It compiles the
-kernel with the pinned Droidian builder, then uses MagiskBoot to replace only
-the kernel in the verified stock boot layout. It uploads the resulting
-`boot.img`, the guarded `arm64` MagiskBoot Debian package, a manifest, component
-audit, and SHA-256 checksums as a downloadable workflow artifact. It can also
-be started manually from GitHub Actions. These are build outputs, not a release
-or a boot-tested image.
-
-MagiskBoot is used here as a workaround, not the intended long-term path: the
-official Droidian pipeline's own `boot.img` (`./build.sh`, no MagiskBoot
-involved) was found and fixed to boot correctly on this device — see
-[`helpers/AVB-FOOTER-FIX.md`](helpers/AVB-FOOTER-FIX.md) for the root cause
-(a missing AVB footer, caused by unset `debian/kernel-info.mk` keys) and
-validation (three clean reboot cycles, no new failed units). CI still
-publishes MagiskBoot builds for now; switching the primary pipeline over is
-tracked as follow-up work.
+[kernel build workflow](.github/workflows/build-kernel.yml), which runs
+`./build.sh` on a GitHub-hosted `ubuntu-24.04` runner using the pinned
+Droidian Docker image (`quay.io/droidian/build-essential`, pinned by content
+digest). It uploads the resulting `boot.img`, `kernel-Image`, every
+`.deb`/`.changes`/`.buildinfo` package, a manifest, and SHA-256 checksums as a
+downloadable workflow artifact. It can also be started manually from GitHub
+Actions. These are build outputs, not a release or a boot-tested image.
 
 A build only becomes a [GitHub Release](https://github.com/Hari-Pi/kernel_realme_RMX2001/releases)
 after it passes the manual install-and-reboot validation in
@@ -62,13 +53,6 @@ is currently a manual step (`gh release create`) run once that validation
 passes; see that doc's "Publish a validated build" section. Gating the publish
 step on an automatic report of reboot success from the device, instead of a
 manual step, is tracked as follow-up work and not yet implemented.
-
-The workflow compiles on a GitHub-hosted `ubuntu-24.04` runner using the pinned
-Droidian Docker image. It uses two build jobs. A read-only deploy key stored as
-the `BOOT_BACKUPS_SSH_KEY` Actions secret lets it fetch the private, verified
-stock image. It downloads the pinned MagiskBoot binary from the official v30.7
-release and verifies both inputs by SHA-256. Each push to `droidian` builds and
-uploads the files automatically.
 
 ## Droidian installation notes
 

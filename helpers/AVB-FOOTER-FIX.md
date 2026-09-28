@@ -87,11 +87,17 @@ produces a fully bootable image for this device without MagiskBoot.
 
 ## What's left open
 
-- **Not yet switched over.** CI (`.github/workflows/build-kernel.yml`) and
-  the documented install procedure
-  ([`helpers/KERNEL-BUILD-AND-TEST.md`](KERNEL-BUILD-AND-TEST.md)) still use
-  `build-magiskboot-deb.sh`. Retiring MagiskBoot from the primary pipeline is
-  a deliberate follow-up decision, not done automatically by this fix.
+- **Switched over.** CI (`.github/workflows/build-kernel.yml`) now runs
+  `./build.sh` directly; `build-magiskboot-deb.sh` is kept only as a manual
+  fallback (see the last section of
+  [`KERNEL-BUILD-AND-TEST.md`](KERNEL-BUILD-AND-TEST.md)).
+- **`console=tty0` not set.** The official porting guide's
+  [kernel-compilation.md](https://github.com/droidian-releng/docs.droidian.org/blob/main/content/porting-guide/kernel-compilation.md)
+  recommends appending `console=tty0` (alongside `droidian.lvm.prefer`, which
+  this device's cmdline already has) to `KERNEL_BOOTIMAGE_CMDLINE`. Not
+  applied here — the device already boots and behaves correctly without it,
+  and changing the cmdline needs its own full reboot-validation cycle. Worth
+  adding if early-boot console visibility is ever needed for debugging.
 - **One remaining, likely-harmless header difference**: `second bootloader
   load address` is `0x00000000` in the official build vs `0x40f00000` in
   stock/MagiskBoot. `second bootloader size` is `0` in all three, so no
