@@ -46,6 +46,15 @@ audit, and SHA-256 checksums as a downloadable workflow artifact. It can also
 be started manually from GitHub Actions. These are build outputs, not a release
 or a boot-tested image.
 
+MagiskBoot is used here as a workaround, not the intended long-term path: the
+official Droidian pipeline's own `boot.img` (`./build.sh`, no MagiskBoot
+involved) was found and fixed to boot correctly on this device — see
+[`helpers/AVB-FOOTER-FIX.md`](helpers/AVB-FOOTER-FIX.md) for the root cause
+(a missing AVB footer, caused by unset `debian/kernel-info.mk` keys) and
+validation (three clean reboot cycles, no new failed units). CI still
+publishes MagiskBoot builds for now; switching the primary pipeline over is
+tracked as follow-up work.
+
 A build only becomes a [GitHub Release](https://github.com/Hari-Pi/kernel_realme_RMX2001/releases)
 after it passes the manual install-and-reboot validation in
 [`helpers/KERNEL-BUILD-AND-TEST.md`](helpers/KERNEL-BUILD-AND-TEST.md). Publishing
