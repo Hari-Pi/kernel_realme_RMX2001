@@ -112,6 +112,64 @@ removed (delete
 `/usr/lib/droid-vendor-overlay/etc/vintf/manifest.xml`, or restore it from
 the backup above) so the real HAL can be declared and started again.
 
+## polkit was masked, causing apt update/install to print a bogus timeout
+
+**Symptom:** every `apt update` (and `apt install`) printed:
+
+```
+Error: Timeout was reached
+```
+
+interleaved with otherwise-normal output.
+
+**Root cause:** the `packagekit` package installs an apt hook
+(`/etc/apt/apt.conf.d/20packagekit`, `APT::Update::Post-Invoke-Success` /
+`DPkg::Post-Invoke`) that runs on every `apt update`/install:
+
+```
+gdbus call --system --dest org.freedesktop.PackageKit \
+  --object-path /org/freedesktop/PackageKit --timeout 4 \
+  --method org.freedesktop.PackageKit.StateHasChanged cache-update > /dev/null
+```
+
+This D-Bus-activates `packagekitd`. `packagekitd` failed to initialize its
+APT backend because `polkit.service` was masked
+(`/etc/systemd/system/polkit.service -> /dev/null`, created manually on
+2026-08-28, not a stock Droidian default), even though the `polkitd` package
+itself was installed. With PackageKit unable to start, the `gdbus` call hung
+until its 4-second timeout and printed `Error: Timeout was reached` to
+stderr — the hook only redirects the call's **stdout** to `/dev/null`, so the
+stderr message leaked straight into apt's output.
+
+**Fix applied:**
+
+```sh
+sudo systemctl unmask polkit.service
+sudo systemctl start polkit.service
+```
+
+This is the root-cause fix (PackageKit's D-Bus call now succeeds instead of
+timing out) rather than just silencing the symptom. It also restores normal
+polkit-based authorization prompts for anything on the device that expects
+them. `polkit.service` is `static` (dependency/D-Bus activated, not directly
+enabled), so unmasking it is sufficient — nothing additional needs enabling,
+and this survives reboots.
+
+Verify:
+
+```sh
+gdbus call --system --dest org.freedesktop.PackageKit \
+  --object-path /org/freedesktop/PackageKit --timeout 4 \
+  --method org.freedesktop.PackageKit.StateHasChanged cache-update
+# expect: () with exit code 0, not "Error: Timeout was reached"
+sudo apt update   # expect no "Error: Timeout was reached" line
+```
+
+**To reapply after a from-scratch flash:** only needed if whatever masked
+`polkit.service` in the first place (unknown — predates this session) is
+part of that flash image. Run the two `systemctl` commands above if the
+timeout reappears.
+
 ## Known pre-existing failed units (not caused by any of the above)
 
 `systemctl --failed` normally reports these four units on this device,
