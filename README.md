@@ -3,6 +3,17 @@
 Linux 4.14.141 kernel source and reproducible build tooling for the Realme 6
 RMX2001 Droidian port.
 
+## Flashing Droidian from scratch
+
+The stock upstream Droidian `devtools-api29-arm64` recovery zip fails to
+loop-mount its rootfs payload in recovery on this specific device. A fixed
+build is published here:
+[`rmx2001-recovery-api29-loopmount-fixed`](https://github.com/Hari-Pi/kernel_realme_RMX2001/releases/tag/rmx2001-recovery-api29-loopmount-fixed) —
+flash it via `adb sideload` or your recovery's sideload/install menu, same
+as any other `package-sideload` zip. After first boot, flash a validated
+kernel (see below) and run the [Quick start](#quick-start-already-flashed-device)
+one-liner.
+
 ## Quick start (already-flashed device)
 
 On a device already running Droidian with a working kernel, connect to
