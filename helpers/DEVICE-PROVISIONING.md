@@ -404,6 +404,40 @@ unlike Firefox) is the browser expected to benefit from this fix. Chromium is
 not actually installed (only `chromium-sandbox`, a dependency of something
 else) so it was not evaluated as an alternative.
 
+## Server mode audit: leftover phone-stack processes and services (2026-09-28)
+
+With this device now running in server mode "for the most part", audited
+what was still running that shouldn't be. Two real gaps found and fixed:
+
+- **`audiosystem-passthrough.service`** (bridges PulseAudio to the Android
+  audio HAL) kept running in server mode even though `pulseaudio.service`
+  was correctly masked. Its unit file only has `After=pulseaudio.service` (a
+  weak ordering hint), not a real dependency (`Requires=`/`BindsTo=`), so
+  masking pulseaudio never stopped it, leaving it holding the Android audio
+  HAL open for no reason. **Fixed in `server-mode.sh`**: added it to the same
+  mask/unmask group as `pulseaudio.service`/`pulseaudio.socket`
+  (`USER_AUDIO_UNITS`), so it now correctly stops in `mode on` and restarts
+  in `mode off`. Verified: process gone after `server mode on`, confirmed
+  back as `masked`/`inactive`.
+- **`mmsd-tng.service`** (MMS daemon) and **`calls-daemon.service`** (phone
+  dialer/call handler) were both running and consuming a small but pointless
+  footprint. Since no SIM will ever be used in this device (same reasoning
+  as the `ofono`/`ModemManager` decision above), these can never do anything
+  useful either. Masked permanently at the user level:
+  ```sh
+  systemctl --user mask --now mmsd-tng.service calls-daemon.service
+  ```
+  These are `--user` units (not system units like `ofono`/`ModemManager`),
+  so they're not part of `server-mode.sh`'s `PHONE_UNITS` mechanism at all —
+  reapply the command above after a reflash if MMS/calls daemons come back.
+
+**Not a bug, left as-is:** `systemctl --user --failed` in server mode also
+shows `xdg-desktop-portal-gtk.service`, `xdg-desktop-portal-phosh.service`
+(both need a running compositor to attach to, which server mode intentionally
+doesn't have), and `fpd-unlockd.service` (downstream of the already-documented
+broken fingerprint HAL, see `droidian-fpd.service` above) — none of these
+indicate a problem, they're expected consequences of already-known states.
+
 ## Upstream Droidian repo audit (2026-09-28)
 
 Checked the actual upstream source repos (not just this device's apt cache)

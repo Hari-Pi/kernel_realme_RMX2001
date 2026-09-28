@@ -276,26 +276,36 @@ restore_phone_units() {
     fi
 }
 
+# audiosystem-passthrough bridges PulseAudio to the Android audio HAL. It
+# only has a weak After=pulseaudio.service ordering, not a real dependency,
+# so masking pulseaudio alone does not stop it - it keeps running (and
+# holding the Android audio HAL open) even in server mode unless masked here
+# too.
+USER_AUDIO_UNITS="pulseaudio.service pulseaudio.socket audiosystem-passthrough.service"
+
 mask_user_audio() {
     user=$1
     uid=$(desktop_uid "$user")
     gid=$(desktop_gid "$user")
     config_dir=$(desktop_home "$user")/.config/systemd/user
 
-    if [ -L "$config_dir/pulseaudio.service" ] &&
-       [ "$(readlink "$config_dir/pulseaudio.service")" = /dev/null ] &&
-       [ -L "$config_dir/pulseaudio.socket" ] &&
-       [ "$(readlink "$config_dir/pulseaudio.socket")" = /dev/null ]; then
+    already_masked=1
+    for unit in $USER_AUDIO_UNITS; do
+        [ -L "$config_dir/$unit" ] && [ "$(readlink "$config_dir/$unit")" = /dev/null ] || already_masked=0
+    done
+    if [ "$already_masked" -eq 1 ]; then
         log "  audio services are already disabled for $user"
         return 0
     fi
 
     log "  stopping audio services for $user"
-    user_systemctl "$user" stop pulseaudio.service pulseaudio.socket >/dev/null 2>&1 || true
+    # shellcheck disable=SC2086
+    user_systemctl "$user" stop $USER_AUDIO_UNITS >/dev/null 2>&1 || true
     install -d -o "$uid" -g "$gid" -m 700 "$config_dir"
-    ln -sfn /dev/null "$config_dir/pulseaudio.service"
-    ln -sfn /dev/null "$config_dir/pulseaudio.socket"
-    chown -h "$uid:$gid" "$config_dir/pulseaudio.service" "$config_dir/pulseaudio.socket"
+    for unit in $USER_AUDIO_UNITS; do
+        ln -sfn /dev/null "$config_dir/$unit"
+        chown -h "$uid:$gid" "$config_dir/$unit"
+    done
     user_systemctl "$user" daemon-reload >/dev/null 2>&1 || true
 }
 
@@ -304,7 +314,7 @@ restore_user_audio() {
     config_dir=$(desktop_home "$user")/.config/systemd/user
 
     need_restore=0
-    for unit in pulseaudio.service pulseaudio.socket; do
+    for unit in $USER_AUDIO_UNITS; do
         path=$config_dir/$unit
         if [ -L "$path" ] && [ "$(readlink "$path")" = /dev/null ]; then
             need_restore=1
@@ -319,7 +329,10 @@ restore_user_audio() {
 
     log "  restoring audio services for $user"
     user_systemctl "$user" daemon-reload >/dev/null 2>&1 || true
-    user_systemctl "$user" start pulseaudio.socket pulseaudio.service >/dev/null 2>&1 || true
+    # Ordering (audiosystem-passthrough After=pulseaudio.service) is handled
+    # by systemd itself from a single start invocation.
+    # shellcheck disable=SC2086
+    user_systemctl "$user" start $USER_AUDIO_UNITS >/dev/null 2>&1 || true
 }
 
 # Reads and changes every Android HAL unit's state with one container attach
