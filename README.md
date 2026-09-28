@@ -3,6 +3,20 @@
 Linux 4.14.141 kernel source and reproducible build tooling for the Realme 6
 RMX2001 Droidian port.
 
+## Quick start (already-flashed device)
+
+On a device already running Droidian with a working kernel, connect to
+Wi-Fi, then run:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Hari-Pi/kernel_realme_RMX2001/droidian/helpers/bootstrap.sh | bash
+```
+
+This installs the [adaptation package](#droidian-installation-notes) (every
+device-specific fix in one `.deb`) and brings up the Phosh phone GUI. Safe to
+re-run. Reboot afterward so the VINTF manifest override and GStreamer decoder
+ranking fully apply.
+
 ## Build a boot package
 
 The primary build path is the official Droidian pipeline: it compiles the
