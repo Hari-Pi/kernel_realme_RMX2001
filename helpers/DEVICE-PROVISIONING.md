@@ -62,15 +62,57 @@ the moment the graphical target is reached, exactly as they were under the
 original serial script — they just hadn't been noticed before because nobody
 checked `systemctl --failed` immediately after a mode toggle.
 
-- **`bluebinder.service`** crash-loops with `Failed to open /dev/rfkill: No
-  such file or directory`. This kernel has no RFKILL support at all —
-  `/dev/rfkill` doesn't exist and `modprobe rfkill` reports "Module rfkill
-  not found" (never built, not just unloaded). `bluebinder` can never succeed
-  until a kernel build enables `CONFIG_RFKILL`. It has been masked
-  (`sudo systemctl mask bluebinder.service`) to stop the crash loop, since it
-  was purely burning restart attempts for no possible benefit, and removed
-  from `server-mode.sh`'s `PHONE_UNITS` list so `server mode off` doesn't
-  keep re-unmasking something guaranteed to crash-loop.
+- **`bluebinder.service`** crash-looped with `Failed to open /dev/rfkill: No
+  such file or directory`, because this kernel had no RFKILL support at all —
+  `/dev/rfkill` didn't exist and `modprobe rfkill` reported "Module rfkill
+  not found" (never built, not just unloaded). **Fixed** by enabling
+  `CONFIG_RFKILL=y` in [`arch/arm64/configs/RMX2001_defconfig`](../arch/arm64/configs/RMX2001_defconfig)
+  (commit `0ae6050bf`) and installing the resulting build — see
+  [`rmx2001-magiskboot-kernel-rfkill-20260928`](https://github.com/Hari-Pi/kernel_realme_RMX2001/releases/tag/rmx2001-magiskboot-kernel-rfkill-20260928).
+  Verified on-device: `/dev/rfkill` exists, `rfkill list` shows `hci0:
+  Bluetooth` unblocked, `bluebinder` logs "Bluetooth initialized
+  successfully", and `bluetoothctl show` reports a powered-on controller.
+  `bluebinder` was unmasked and re-added to `server-mode.sh`'s `PHONE_UNITS`
+  list (it's no longer guaranteed to fail).
+
+  Fixing RFKILL surfaced two further, separate bugs needed to get
+  `bluebinder.service` to actually report `active` instead of `failed`:
+
+  1. `/usr/bin/droid/bluebinder_post.sh` (from the `bluebinder` package) had
+     `if [ "$bt_addr_file" == "" ]; then` on line 18 — `==` is a bashism, not
+     valid in POSIX `[ ]` under `/bin/sh` (dash), and made the script exit
+     with "unexpected operator" before it could even check for a real
+     address. Fixed directly on the regular writable rootfs (not a dpkg
+     conffile, so a package upgrade could silently restore the bug — a
+     backup of the original is kept alongside it as
+     `bluebinder_post.sh.orig-bashism-bug`):
+     ```sh
+     sudo sed -i 's/\[ "\$bt_addr_file" == "" \]/[ "$bt_addr_file" = "" ]/' /usr/bin/droid/bluebinder_post.sh
+     ```
+  2. With that fixed, the script still fails because this device has no
+     Bluetooth MAC address available through any of the three Android
+     properties it checks (`ro.bt.bdaddr_path`, `ro.vendor.bt.bdaddr_path`,
+     `persist.vendor.service.bdroid.bdaddr` were all empty) — a real,
+     separate device-porting gap (the actual address likely lives in NVRAM
+     and needs a device-specific `droid-get-bt-address.sh`, which doesn't
+     exist here). Rather than leave the whole service reporting `failed`
+     over a missing persisted address, its exit code was made non-fatal to
+     the unit via a systemd drop-in (survives package upgrades cleanly,
+     unlike editing the shipped unit file):
+     ```sh
+     sudo install -d -m 755 /etc/systemd/system/bluebinder.service.d
+     sudo tee /etc/systemd/system/bluebinder.service.d/99-ignore-missing-bdaddr.conf <<'EOF'
+     [Service]
+     ExecStartPost=
+     ExecStartPost=-/usr/bin/droid/bluebinder_post.sh
+     EOF
+     sudo systemctl daemon-reload
+     ```
+     BlueZ falls back to the controller's own default address
+     (confirmed working: `bluetoothctl show` reports a real, valid
+     controller address and full profile list). Finding and wiring up this
+     device's actual persisted Bluetooth address is separate follow-up work,
+     not required for Bluetooth to function.
 - **`ModemManager.service`** reliably times out after 90 seconds
   (`start operation timed out`) on every attempt (confirmed 3/3). This device
   will never have a SIM installed, so cellular/SMS is not a feature being
@@ -277,9 +319,9 @@ timeout reappears.
 
 ## Known pre-existing failed units (not caused by any of the above)
 
-`systemctl --failed` normally reports these four units on this device,
-independent of kernel version or the manifest change above. They are
-environment/porting issues in this Droidian bring-up, not regressions:
+`systemctl --failed` normally reports these units on this device, independent
+of kernel version or the manifest change above. They are environment/porting
+issues in this Droidian bring-up, not regressions:
 
 - `android-mount.service` — several Android partitions have no valid
   filesystem yet, or are already mounted by the time the unit runs (`oppo_*`,
@@ -291,6 +333,9 @@ environment/porting issues in this Droidian bring-up, not regressions:
 - `lxc-net.service` — `iptables`/`ip6tables` errors
   (`ip6tables ... table 'nat': Table does not exist`); this kernel's config
   has `CONFIG_IP6_NF_NAT` disabled.
+- `nfcd.service` — same pattern as `droidian-fpd`: `binder-wait` reports
+  `No such service: android.hardware.nfc@1.1::INfc/default`, i.e. no NFC HAL
+  is registered on this port.
 
 These were confirmed byte-identical across boots and kernel versions before
 being ruled out as regressions; do not spend time chasing them as kernel

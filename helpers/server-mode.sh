@@ -19,8 +19,7 @@ FB_BLANK_FILE=/sys/class/graphics/fb0/blank
 REQUESTED_USER=
 
 # ofono, ModemManager: no SIM will ever be used on this device, kept masked permanently.
-# bluebinder: needs /dev/rfkill, which this kernel does not provide (no CONFIG_RFKILL); kept masked permanently.
-PHONE_UNITS="cups cups-browsed cups.socket cups.path bluetooth nfcd geoclue iio-sensor-proxy sensorfwd openvpn strongswan-starter lm-sensors vnstat udisks2 accounts-daemon NetworkManager-wait-online polkit upower avahi-daemon avahi-daemon.socket serial-getty@ttyS0"
+PHONE_UNITS="cups cups-browsed cups.socket cups.path bluetooth bluebinder nfcd geoclue iio-sensor-proxy sensorfwd openvpn strongswan-starter lm-sensors vnstat udisks2 accounts-daemon NetworkManager-wait-online polkit upower avahi-daemon avahi-daemon.socket serial-getty@ttyS0"
 GUI_START_UNITS="accounts-daemon polkit upower udisks2 bluetooth geoclue iio-sensor-proxy sensorfwd avahi-daemon.socket"
 ANDROID_HAL_UNITS="camerahalserver neuralnetworks_hal_service_gpunn neuralnetworks_hal_service_neuron_ann camera_service mediaextractor vendor.ril-daemon-mtk"
 
