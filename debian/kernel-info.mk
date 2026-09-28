@@ -60,6 +60,13 @@ KERNEL_BOOTIMAGE_DTB_OFFSET = 0x0bc08000
 # Kernel bootimage version. Defaults to 0 (legacy header).
 KERNEL_BOOTIMAGE_VERSION = 2
 
+# Stock RMX2001 boot image OS version/patch level (matches the validated
+# stock/MagiskBoot-preserved boot image). Left unset, releng-build-package
+# zeroes these header fields, which some bootloaders treat as a rollback or
+# integrity problem.
+KERNEL_BOOTIMAGE_OS_VERSION = 10.0.0
+KERNEL_BOOTIMAGE_PATCH_LEVEL = 2021-08
+
 ########################################################################
 # Android verified boot
 ########################################################################
@@ -73,6 +80,13 @@ DEVICE_VBMETA_REQUIRED = 0
 # device is a Samsung device that requires flag 0 to be present
 # Use 0 (no, default) or 1.
 DEVICE_VBMETA_IS_SAMSUNG = 0
+
+# Boot partition size. If specified, an AVB footer will be added at the end
+# of the bootimage. Left unset, releng-build-package produces a boot.img with
+# no AVB footer at all, which this device's bootloader refuses to boot - the
+# verified stock and MagiskBoot-repacked images both carry a valid AVB footer
+# at this exact partition size.
+KERNEL_BOOTIMAGE_PARTITION_SIZE = 33554432
 
 ########################################################################
 # Automatic flashing on package upgrades
