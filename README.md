@@ -92,11 +92,6 @@ kept as a lighter-weight alternative.
 
 For the full kernel compilation procedure, see the
 [Droidian porting guide](https://github.com/droidian/porting-guide/blob/master/kernel-compilation.md).
-The older workflow ran `RELENG_HOST_ARCH="arm64" releng-build-package` in the
-Docker build environment and placed `boot.img` in `out/KERNEL_OBJ/`. For that
-workflow, use the API 29 ZIP from the
-[Droidian CI images](https://github.com/droidian-images/droidian/releases).
-The guarded MagiskBoot package workflow above is the current build path.
 
 ### Connect over USB and enable Wi-Fi
 
@@ -121,56 +116,29 @@ wget https://raw.githubusercontent.com/NeelamArunkumar/droidian-script/main/70-d
 
 Restart the phone after installing the udev rule.
 
-### Power button helper
+### Server mode and the power button helper
 
-The earlier repository included `helpers/power-button/` with a helper to turn
-the screen on using the power button. Its installer also installed
-`pbhelper.service`; the original follow-up step installed
-`libdroid-hal-lights`. Those files were removed from the current branch during
-the public build cleanup. The
-[earlier helper files](https://github.com/Hari-Pi/kernel_realme_RMX2001/tree/13b15f81a040/helpers/power-button)
-and [installation script](https://github.com/Hari-Pi/kernel_realme_RMX2001/blob/13b15f81a040/helpers/power-button/script.sh)
-remain available in repository history.
+The [Quick start](#quick-start-already-flashed-device) one-liner at the top
+of this README installs both of these — nothing further to do manually on a
+device that's already been through it.
 
-The original SSH installation command, pinned to the older script, was:
+`server mode` (installed as `/usr/local/bin/server`, from
+[`helpers/server-mode.sh`](helpers/server-mode.sh)) toggles the device
+between headless server mode and the Phosh phone GUI:
 
 ```sh
-wget https://raw.githubusercontent.com/Hari-Pi/kernel_realme_RMX2001/13b15f81a040/helpers/power-button/script.sh
-chmod +x script.sh
-./script.sh
-sudo apt install libdroid-hal-lights
-```
-
-### Reversible server mode
-
-The earlier setup included a `server mode` command. `server mode on` disabled
-the phone interface while leaving SSH, networking, Cloudflare tunnels, Docker,
-and persistent performance tuning in place. `server mode off` restored Phosh,
-the display, touch input, audio, Android phone HALs, and the power-button
-helper. The selected mode persisted across reboots.
-
-The server-mode installer and headless setup script were removed from the
-current branch during the public build cleanup. Their
-[earlier versions](https://github.com/Hari-Pi/kernel_realme_RMX2001/tree/90820a2442c1/helpers)
-are available in repository history. With those scripts restored on a device,
-the original commands were:
-
-```sh
-sudo helpers/setup-headless-server.sh
 server mode status
-server mode on
-server mode off
+sudo server mode on    # headless: display, touch, audio, and phone HALs off
+sudo server mode off   # phone GUI: Phosh, display, touch, audio, phone HALs back on
 ```
 
-The earlier README also documented `sudo helpers/server-mode.sh install` for
-installing just the mode command from a checkout of that earlier revision.
-
-The installer detected the invoking desktop user; `--user NAME` selected a
-specific user when installing as root or on a device with multiple interactive
-users. Server mode did not change SSH, networking, Cloudflare, Tailscale, or
-Docker. The earlier
-[server maintenance notes](https://github.com/Hari-Pi/kernel_realme_RMX2001/blob/90820a2442c1/helpers/SERVER-MAINTENANCE.md)
-cover package sources and distribution-upgrade recovery.
+`server mode on` leaves SSH, networking, Cloudflare tunnels, and Docker
+untouched. The selected mode persists across reboots. `server mode off` also
+re-enables `pbhelper.service` (the power-button screen-wake helper) as part
+of restoring the phone GUI — it is not installed or managed separately.
+See [`helpers/DEVICE-PROVISIONING.md`](helpers/DEVICE-PROVISIONING.md) for
+the full design rationale (why it checks state before acting, runs
+independent steps in parallel, and how Ctrl+C cancellation works).
 
 ## Safety
 
