@@ -5,14 +5,15 @@ RMX2001 Droidian port.
 
 ## Flashing Droidian from scratch
 
-The stock upstream Droidian `devtools-api29-arm64` recovery zip fails to
-loop-mount its rootfs payload in recovery on this specific device. A fixed
-build is published here:
-[`rmx2001-recovery-api29-loopmount-fixed`](https://github.com/Hari-Pi/kernel_realme_RMX2001/releases/tag/rmx2001-recovery-api29-loopmount-fixed) —
-flash it via `adb sideload` or your recovery's sideload/install menu, same
-as any other `package-sideload` zip. After first boot, flash a validated
-kernel (see below) and run the [Quick start](#quick-start-already-flashed-device)
-one-liner.
+See it running first:
+[demo video and project writeup](https://hari-pi.com/projects/kernel-realme-rmx2001.html).
+
+Full procedure — bootloader unlock (MTK Bypass + SP Flash Tool + B.56
+firmware), `lk` patching, custom recovery, and flashing this device's
+[loop-mount-fixed rootfs zip](https://github.com/Hari-Pi/kernel_realme_RMX2001/releases/tag/rmx2001-recovery-api29-loopmount-fixed) —
+is in [`helpers/FLASHING-FROM-SCRATCH.md`](helpers/FLASHING-FROM-SCRATCH.md).
+After first boot, flash a validated kernel (see below) and run the
+[Quick start](#quick-start-already-flashed-device) one-liner.
 
 ## Quick start (already-flashed device)
 
