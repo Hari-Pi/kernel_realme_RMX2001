@@ -8,6 +8,111 @@ automatically.
 
 Everything below targets the Droidian server reachable as `dazai@droidian`.
 
+## `server-mode` toggle script
+
+`/usr/local/sbin/server-mode` (symlinked from `/usr/local/bin/server`, run as
+`server mode on|off|status`) toggles the device between headless-server mode
+and the Phosh phone GUI. A copy is tracked here at
+[`helpers/server-mode.sh`](server-mode.sh) so it survives a reflash; deploy it
+with:
+
+```sh
+sudo install -o root -g root -m 755 helpers/server-mode.sh /usr/local/sbin/server-mode
+```
+
+It was rewritten from its original brute-force form to:
+
+- **Check state before acting.** `unit_table()` reads `LoadState`,
+  `ActiveState`, and `UnitFileState` for a whole group of units with one
+  `systemctl show` call, instead of forking `systemctl is-enabled`/`is-active`
+  once per unit. Masking, unmasking, and starting units, and starting/stopping
+  Android HAL services inside the `android` LXC container, all skip units
+  already in the desired state and log `<unit> is already <state>` instead of
+  reissuing the command.
+- **Batch remaining work into single calls.** Units that do need a state
+  change are passed to one `systemctl mask/unmask/start ...` invocation
+  (systemd handles the whole list without a subprocess per unit), and Android
+  HAL state is read and changed with one `lxc-attach` each instead of one per
+  service.
+- **Run independent steps in parallel.** `run_parallel()` runs the phone-unit
+  masking/unmasking, desktop audio, Android HALs, the display on/off sequence,
+  and boot-target changes concurrently (they don't depend on each other),
+  shows a live `[####----] 2/5 steps done (3s)` progress bar, and prints each
+  step's grouped output once everything finishes. Measured result: a full
+  `server mode off` restore went from ~87s to ~18s (the remaining time is an
+  unavoidable 8-second hardware settle sleep plus the Wayland-socket wait
+  inside the display-on sequence, which cannot be parallelized away).
+- **Cancel cleanly.** Ctrl+C during `run_parallel` stops every step still
+  running (killing each step's actual command, not just its subshell wrapper,
+  so nothing is left orphaned) and exits with status 130, instead of leaving
+  the terminal or partial background work in a stuck state.
+
+Re-running `mode on` or `mode off` back-to-back was verified to be a near
+no-op the second time (every unit reports "already ..." and no
+`systemctl mask/unmask/start` call is issued at all), and a real on/off
+round-trip was tested live with no change to the known failed-unit baseline
+below, aside from the two pre-existing issues discovered while testing (next
+section) — both unrelated to this rewrite.
+
+### Two pre-existing issues surfaced while testing the rewrite
+
+Neither of these is caused by the parallel rewrite: both units are pulled in
+passively by systemd's own `WantedBy=graphical.target`/`Wants=` dependencies
+the moment the graphical target is reached, exactly as they were under the
+original serial script — they just hadn't been noticed before because nobody
+checked `systemctl --failed` immediately after a mode toggle.
+
+- **`bluebinder.service`** crash-loops with `Failed to open /dev/rfkill: No
+  such file or directory`. This kernel has no RFKILL support at all —
+  `/dev/rfkill` doesn't exist and `modprobe rfkill` reports "Module rfkill
+  not found" (never built, not just unloaded). `bluebinder` can never succeed
+  until a kernel build enables `CONFIG_RFKILL`. It has been masked
+  (`sudo systemctl mask bluebinder.service`) to stop the crash loop, since it
+  was purely burning restart attempts for no possible benefit, and removed
+  from `server-mode.sh`'s `PHONE_UNITS` list so `server mode off` doesn't
+  keep re-unmasking something guaranteed to crash-loop.
+- **`ModemManager.service`** reliably times out after 90 seconds
+  (`start operation timed out`) on every attempt (confirmed 3/3). This device
+  will never have a SIM installed, so cellular/SMS is not a feature being
+  given up: `ofono.service` and `ModemManager.service` are now masked
+  permanently (`systemctl mask --now`) and removed from `server-mode.sh`'s
+  `PHONE_UNITS`/`GUI_START_UNITS` lists, so `server mode off` no longer
+  unmasks or tries to start them.
+
+  Masking `ModemManager.service` alone left its D-Bus activation file
+  (`/usr/share/dbus-1/system-services/org.freedesktop.ModemManager1.service`,
+  pointing at the alias unit `dbus-org.freedesktop.ModemManager1.service`)
+  still in place, so any app calling `org.freedesktop.ModemManager1` over
+  D-Bus — notably **gnome-control-center's WWAN panel, on every single
+  Settings launch** — tried to D-Bus-activate a masked unit and got a
+  confusing `failed to load properly ... File exists` error instead of a
+  fast, clean "service unknown". This was a real, measured contributor to
+  Settings feeling slow to open, not just a cosmetic warning. Fixed by
+  disabling the D-Bus activation file itself:
+
+  ```sh
+  sudo mv /usr/share/dbus-1/system-services/org.freedesktop.ModemManager1.service \
+          /usr/share/dbus-1/system-services/org.freedesktop.ModemManager1.service.disabled-no-sim
+  sudo systemctl reload dbus.service
+  ```
+
+  After this, `busctl status org.freedesktop.ModemManager1` fails
+  immediately with a clean `No such device or address` instead of a stalled
+  mask conflict, and the WWAN-panel warning no longer appears in
+  `gnome-control-center`'s output at all. This file lives on the regular
+  writable rootfs (owned by the `modemmanager` package, not a dpkg conffile),
+  so a package upgrade could silently restore it — reapply the `mv` above if
+  the warning/stall ever comes back.
+
+  **Not yet fully explained:** a headless CPU-usage trace of
+  `gnome-control-center` showed its real startup CPU burst finishing in
+  roughly 1.5 seconds even before this fix, so this ModemManager stall is a
+  confirmed real bug worth having fixed, but it may not fully account for
+  what the perceived on-screen slowness feels like when actually watching the
+  panel open on the phone. If Settings still feels slow to open after this
+  fix, that needs a fresh look with the app open on the real display (a
+  headless SSH session can't observe on-screen render timing).
+
 ## Vendor overlay mechanism
 
 `/vendor` is a read-only overlay:
