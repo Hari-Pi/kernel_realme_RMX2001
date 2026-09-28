@@ -66,9 +66,11 @@ uploads the files automatically.
 Beyond the kernel itself, the live Droidian server has userspace-level fixes
 applied directly on-device that are not part of this repo or any kernel
 package (for example, a VINTF manifest override). These are **not**
-preserved by a reflash. See
+preserved by a reflash. After flashing, run
+[`helpers/setup-rmx2001.sh`](helpers/setup-rmx2001.sh) to reapply all of them
+in one idempotent pass; see
 [`helpers/DEVICE-PROVISIONING.md`](helpers/DEVICE-PROVISIONING.md) for what
-was changed, why, and how to reapply it from scratch.
+each fix is and why it's needed.
 
 For the full kernel compilation procedure, see the
 [Droidian porting guide](https://github.com/droidian/porting-guide/blob/master/kernel-compilation.md).

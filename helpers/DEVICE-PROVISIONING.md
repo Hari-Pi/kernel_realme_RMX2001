@@ -3,8 +3,23 @@
 This records userspace changes made directly on the running Droidian device
 that are **not** part of this kernel tree and are **not** carried by any
 kernel package or release. If the device is ever reflashed or reprovisioned
-from scratch, these steps must be reapplied by hand — nothing here happens
-automatically.
+from scratch, these must be reapplied.
+
+**Run [`helpers/setup-rmx2001.sh`](setup-rmx2001.sh) first.** It applies
+every fix documented below as one idempotent script (checks current state,
+only changes what's needed, safe to re-run any time):
+
+```sh
+sudo ./helpers/setup-rmx2001.sh [--user NAME]
+sudo reboot
+```
+
+The prose below exists to explain *why* each fix exists and to let you apply
+one piece by hand if you ever need to; the script is what you actually run
+after a reflash. If you add a new device-specific fix by hand, add it to both
+the script and this document in the same change — this doc is the source of
+truth the script is generated from, and they drift apart if only one gets
+updated.
 
 Everything below targets the Droidian server reachable as `dazai@droidian`.
 
