@@ -63,6 +63,13 @@ uploads the files automatically.
 
 ## Droidian installation notes
 
+Beyond the kernel itself, the live Droidian server has userspace-level fixes
+applied directly on-device that are not part of this repo or any kernel
+package (for example, a VINTF manifest override). These are **not**
+preserved by a reflash. See
+[`helpers/DEVICE-PROVISIONING.md`](helpers/DEVICE-PROVISIONING.md) for what
+was changed, why, and how to reapply it from scratch.
+
 For the full kernel compilation procedure, see the
 [Droidian porting guide](https://github.com/droidian/porting-guide/blob/master/kernel-compilation.md).
 The older workflow ran `RELENG_HOST_ARCH="arm64" releng-build-package` in the
