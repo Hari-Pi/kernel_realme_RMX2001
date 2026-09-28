@@ -33,7 +33,7 @@ log "Fetching the adaptation package source (not the full kernel tree)"
 git clone --quiet --depth 1 --filter=blob:none --sparse --branch "$BRANCH" \
     "$REPO_URL" "$workdir/repo"
 git -C "$workdir/repo" sparse-checkout set --no-cone \
-    adaptation helpers/build-adaptation-deb.sh
+    /adaptation /helpers/build-adaptation-deb.sh
 
 log "Building adaptation-realme-rmx2001"
 "$workdir/repo/helpers/build-adaptation-deb.sh" "$workdir"
